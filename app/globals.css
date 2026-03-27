@@ -1,137 +1,174 @@
-@import "tw-animate-css";
-@import "shadcn/tailwind.css";
-
-html, body {
-  background: #131619 !important;
-  color: #ffffff;
-}
-
-@custom-variant dark (&:is(.dark *));
-
-@tailwind base;
+﻿@tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-@theme inline {
-  --font-heading: var(--font-sans);
-  --font-sans: var(--font-sans);
-  --color-sidebar-ring: var(--sidebar-ring);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar: var(--sidebar);
-  --color-chart-5: var(--chart-5);
-  --color-chart-4: var(--chart-4);
-  --color-chart-3: var(--chart-3);
-  --color-chart-2: var(--chart-2);
-  --color-chart-1: var(--chart-1);
-  --color-ring: var(--ring);
-  --color-input: var(--input);
-  --color-border: var(--border);
-  --color-destructive: var(--destructive);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-accent: var(--accent);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-muted: var(--muted);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-secondary: var(--secondary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-primary: var(--primary);
-  --color-popover-foreground: var(--popover-foreground);
-  --color-popover: var(--popover);
-  --color-card-foreground: var(--card-foreground);
-  --color-card: var(--card);
-  --color-foreground: var(--foreground);
-  --color-background: var(--background);
-  --radius-sm: calc(var(--radius) * 0.6);
-  --radius-md: calc(var(--radius) * 0.8);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) * 1.4);
-  --radius-2xl: calc(var(--radius) * 1.8);
-  --radius-3xl: calc(var(--radius) * 2.2);
-  --radius-4xl: calc(var(--radius) * 2.6);
-}
-
-:root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
-}
-
-.dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
-}
-
 @layer base {
-  * {
-    @apply border-border outline-ring/50;
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+    --primary: 142.1 76.2% 36.3%; /* Greenish for HealthCare */
+    --primary-foreground: 355.7 100% 97.3%;
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 84% 4.9%;
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 84% 4.9%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 142.1 76.2% 36.3%;
+    --radius: 0.5rem;
   }
-  body {
-    @apply bg-background text-foreground;
-  }
-  html {
-    @apply font-sans;
+
+  .dark {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 142.1 70.6% 45.3%;
+    --primary-foreground: 144.4 61.4% 10.5%;
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 142.1 70.6% 45.3%;
   }
 }
+
+/* Keep the rest of your custom code below this */
+html, body {
+  min-height: 100%;
+  margin: 0;
+  padding: 0;
+  background: #131619;
+  
+  font-family: var(--font-sans, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+@layer utilities {
+  .remove-scrollbar::-webkit-scrollbar {
+    width: 0;
+    height: 0;
+  }
+
+  .remove-scrollbar::-webkit-scrollbar-track,
+  .remove-scrollbar::-webkit-scrollbar-thumb,
+  .remove-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: transparent;
+  }
+
+  .text-36-bold { font-size: 2.25rem; line-height: 2.5rem; font-weight: 700; }
+  .text-32-bold { font-size: 2rem; line-height: 2.25rem; font-weight: 700; }
+  .text-24-bold { font-size: 1.5rem; line-height: 1.75rem; font-weight: 700; }
+  .text-18-bold { font-size: 1.125rem; line-height: 1.5rem; font-weight: 700; }
+  .text-14-medium { font-size: 0.875rem; line-height: 1.125rem; font-weight: 500; }
+  .text-14-regular { font-size: 0.875rem; line-height: 1.125rem; font-weight: 400; }
+  .text-12-regular { font-size: 0.75rem; line-height: 1rem; font-weight: 400; }
+}
+
+/* shadcn inputs / datepicker / phone overrides */
+.input-phone,
+.shad-input,
+.shad-input-icon,
+.shad-textArea,
+.react-datepicker__input-container input {
+  background: #1a1d21;
+  color: #ffffff;
+  border-color: #363a3d;
+  border-radius: 0.5rem;
+  height: 2.75rem;
+  padding: 0 0.75rem;
+}
+
+.input-phone {
+  outline: none;
+  margin-left: 4px;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.input-phone::placeholder,
+.shad-input::placeholder,
+.react-datepicker__input-container input::placeholder {
+  color: #aab8c4;
+}
+
+.shad-primary-btn { background: #24AE7C; color: #ffffff; }
+.shad-danger-btn { background: #F24E43; color: #ffffff; }
+.shad-gray-btn { border: 1px solid #363a3d; cursor: pointer; background: #1a1d21; color: #ffffff; }
+
+.shad-select-content,
+.shad-dialog,
+.shad-sheet-content button,
+.shad-combobox-item,
+.shad-select-trigger,
+.shad-dialog {
+  background: #1a1d21;
+  border: 1px solid #363a3d;
+  color: #ffffff;
+}
+
+.shad-error { color: #f87171; }
+
+.shad-table,
+.shad-table-row,
+.shad-table-row-header {
+  border: 1px solid #363a3d;
+  color: #abb8c4;
+}
+
+.shad-table-row-header:hover { background: transparent; }
+
+.shad-otp { width: 100%; display: flex; justify-content: space-between; }
+.shad-otp-slot { display: flex; justify-content: center; align-items: center; border: 1px solid #363a3d; border-radius: 0.5rem; width: 4rem; height: 4rem; }
+
+.date-picker { overflow: hidden; border: 1px solid transparent; width: 100%; font-size: 0.875rem; line-height: 1rem; border-radius: 0.5rem; padding: 0.75rem; outline: none; }
+
+.react-datepicker-wrapper.date-picker { display: flex; align-items: center; }
+
+.react-datepicker,
+.react-datepicker__time,
+.react-datepicker__header,
+.react-datepicker__current-month,
+.react-datepicker__day-name,
+.react-datepicker__day,
+.react-datepicker-time__header {
+  background-color: #1a1d21;
+  border-color: #363a3d;
+  color: #abb8c4;
+}
+
+.react-datepicker__current-month,
+.react-datepicker__day-name,
+.react-datepicker-time__header { color: #ffffff; }
+
+.react-datepicker__triangle { fill: #1a1d21; color: #1a1d21; stroke: #1a1d21; }
+
+.react-datepicker__time-list-item:hover { background-color: #363a3d; }
+
+.react-datepicker__day--selected,
+.react-datepicker__time-list-item--selected { background-color: #24ae7c; color: #ffffff; }
+
+.react-datepicker__time-container { border-left: 1px solid #363a3d; }
+
+.react-datepicker__time-list-item { display: flex; align-items: center; }
+
+

@@ -3,6 +3,7 @@ import { Plus_Jakarta_Sans, Inter } from "next/font/google";
 import "./globals.css";
 
 import { cn } from "@/lib/utils";
+import { ThemeProvider } from "@/components/theme-provider";
 
 const inter = Inter({subsets:['latin'],variable:'--font-sans'});
 
@@ -18,9 +19,14 @@ export default function RootLayout({
 }>) {
   return (
     <html 
-      lang="en" className={cn("h-full", "font-sans", inter.variable)}>
-        <body className="min-h-screen text-white font-sans antialiased">
-          {children}
+      lang="en"  suppressHydrationWarning  className={cn("h-full", "font-sans", inter.variable)}>
+        <body className="min-h-screen  text-white font-sans antialiased">
+          <ThemeProvider
+            attribute="class"
+            defaultTheme="dark"
+          >
+            {children}
+          </ThemeProvider>
         </body>
     </html>
   );
