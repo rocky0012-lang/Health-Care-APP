@@ -5,7 +5,10 @@ import "./globals.css";
 import { cn } from "@/lib/utils";
 import { ThemeProvider } from "@/components/theme-provider";
 
-const inter = Inter({subsets:['latin'],variable:'--font-sans'});
+const FontsSans = Plus_Jakarta_Sans({
+  subsets:['latin'],
+  weight: ['400', '500', '600', '700'],
+  variable:'--font-sans'});
 
 export const metadata: Metadata = {
   title: "Health Care",
@@ -19,7 +22,7 @@ export default function RootLayout({
 }>) {
   return (
     <html 
-      lang="en"  suppressHydrationWarning  className={cn("h-full", "font-sans", inter.variable)}>
+      lang="en"  suppressHydrationWarning  className={cn("h-full", "font-sans", FontsSans.variable)}>
         <body className="min-h-screen  text-white font-sans antialiased">
           <ThemeProvider
             attribute="class"

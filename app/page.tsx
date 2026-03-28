@@ -2,6 +2,7 @@ import PatientForm from "@/components/forms/PatientForm";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import Image from "next/image";
+import LoginForm from "@/components/forms/login-form";
 
 export default function Home() {
   return (
@@ -10,7 +11,7 @@ export default function Home() {
 
 
       <section className="remove-scrollbar container my-auto">
-        <div className="sub-container max-w-[496px]">
+        <div className="sub-container max-w-[896px] flex flex-col items-center">
           <Image 
             src="/assets/icons/logo-full.svg"
             height={100}
@@ -18,10 +19,10 @@ export default function Home() {
             alt="patient"
             className="mb-12 h-10 w-fit"
           />
+         {/* <PatientForm /> */}
+          <LoginForm />
 
-          <PatientForm />
-
-          <div className="text-14-regular mt-20 flex justify-between">
+          <div className="text-14-regular mt-20 flex justify-between w-full">
             <p className="justify-items-end text-dark-dark-600 xl:text-left">
               © 2026 Health Care. All rights reserved.
             </p>
@@ -29,6 +30,11 @@ export default function Home() {
               Admin
             </Link>
           </div>
+          
+          
+          {/* <Button /> */}
+
+
         </div>
       </section>
 
