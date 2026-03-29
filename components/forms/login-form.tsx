@@ -1,5 +1,10 @@
 "use client"
 
+import { z } from "zod"
+import { useState } from "react"
+import { useForm } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -7,20 +12,56 @@ import {
   Field,
   FieldDescription,
   FieldGroup,
-  FieldLabel,
   FieldSeparator,
 } from "@/components/ui/field"
-import { Input } from "@/components/ui/input"
+import CustomFormField from "../CustomFormField"
+import { createUser } from "@/lib/actions/patient.action"
 
-const LoginForm = ({
+const userFormSchema = z.object({
+  name: z.string().min(2, "Name must be at least 2 characters"),
+  email: z.email("Please enter a valid email address"),
+  phone: z
+    .string()
+    .regex(/^\+[1-9]\d{7,14}$/, "Phone must be in E.164 format, e.g. +14155552671"),
+})
+
+export const LoginForm = ({
   className,
   ...props
 }: React.ComponentProps<"div">) => {
+  const router = useRouter()
+  const [isLoading, setIsLoading] = useState(false)
+
+  const form = useForm<z.infer<typeof userFormSchema>>({
+    resolver: zodResolver(userFormSchema),
+    defaultValues: {
+      name: "",
+      email: "",
+      phone: "",
+    },
+  })
+
+  const onSubmit = async (values: z.infer<typeof userFormSchema>) => {
+    setIsLoading(true)
+
+    try {
+      const newUser = await createUser(values)
+      console.log("User created:", newUser)
+      if (newUser?.$id) {
+        router.push(`/patients/${newUser.$id}/register`)
+      }
+    } catch (error) {
+      console.error("Failed to create user:", error)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   return (
     <div className={cn("flex flex-col gap-6 ", className)} {...props}>
       <Card className="overflow-hidden p-0 bg-transparent shadow-none border-none">
         <CardContent className="grid p-0">
-          <form className="p-6 ">
+          <form className="p-6 " onSubmit={form.handleSubmit(onSubmit)}>
             <FieldGroup>
               <div className="flex flex-col items-center gap-2 text-center">
                 <h1 className="text-5xl font-bold">Welcome back</h1>
@@ -28,29 +69,40 @@ const LoginForm = ({
                   Login to your Health Care account
                 </p>
               </div>
+              <CustomFormField
+                id="name"
+                type="text"
+                label="Full Name"
+                className="text-base"
+                placeholder="John Doe"
+                required
+                error={form.formState.errors.name?.message}
+                {...form.register("name")}
+              />
+              <CustomFormField
+                id="email"
+                type="email"
+                label="Email"
+                className="text-base"
+                placeholder="m@example.com"
+                required
+                error={form.formState.errors.email?.message}
+                {...form.register("email")}
+              />
+              <CustomFormField
+                id="phone"
+                type="tel"
+                label="Phone"
+                className="text-base"
+                placeholder="+14155552671"
+                required
+                error={form.formState.errors.phone?.message}
+                {...form.register("phone")}
+              />
               <Field>
-                <FieldLabel htmlFor="email" className="text-2xl">Email</FieldLabel>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="m@example.com"
-                  required
-                />
-              </Field>
-              <Field>
-                <div className="flex items-center">
-                  <FieldLabel htmlFor="password" className="text-2xl">Password</FieldLabel>
-                  <a
-                    href="#"
-                    className="ml-auto text-sm underline-offset-2 hover:underline"
-                  >
-                    Forgot your password?
-                  </a>
-                </div>
-                <Input id="password" type="password" required />
-              </Field>
-              <Field>
-                <Button type="submit" className="text-2xl size-35">Login</Button>
+                <Button type="submit" className="text-2xl size-35" disabled={isLoading}>
+                  {isLoading ? "Creating..." : "Get Started"}
+                </Button>
               </Field>
               <FieldSeparator className="*:data-[slot=field-separator-content]:bg-card">
                 Or continue with
@@ -97,5 +149,4 @@ const LoginForm = ({
       </FieldDescription>
     </div>
   )
-}
-export default LoginForm
+};
