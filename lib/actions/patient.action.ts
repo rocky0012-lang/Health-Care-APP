@@ -42,7 +42,7 @@ export const registerPatient = async (formData: FormData) => {
         const email = String(formData.get("email") || "")
         const phone = String(formData.get("phone") || "")
         const birthDate = String(formData.get("birthDate") || "")
-        const gender = String(formData.get("gender") || "") as Gender
+        const gender = String(formData.get("gender") || "").toLowerCase() as Gender
         const address = String(formData.get("address") || "")
         const occupation = String(formData.get("occupation") || "")
         const emergencyContactName = String(formData.get("emergencyContactName") || "")
@@ -58,6 +58,11 @@ export const registerPatient = async (formData: FormData) => {
         const identificationNumber = String(formData.get("identificationNumber") || "") || undefined
         const privacyConsent = String(formData.get("privacyConsent") || "false") === "true"
         const fullName = `${firstName} ${lastName}`.trim()
+        const parsedBirthDate = new Date(birthDate)
+
+        if (Number.isNaN(parsedBirthDate.getTime())) {
+            throw new Error("Invalid birthDate value")
+        }
 
         if (!DATABASE_ID || !PATIENT_TABLE_ID) {
             throw new Error("Missing DATABASE_ID or PATIENT_TABLE_ID in environment")
@@ -92,7 +97,7 @@ export const registerPatient = async (formData: FormData) => {
                 name: fullName,
                 email,
                 phone,
-                birthDate: new Date(birthDate).toISOString(),
+                birthDate: parsedBirthDate.toISOString(),
                 gender,
                 address,
                 occupation,
@@ -107,14 +112,31 @@ export const registerPatient = async (formData: FormData) => {
                 pastMedicalHistory,
                 identificationType,
                 identificationNumber,
-                identificationDocument,
-                privasyConsent: privacyConsent,
+                identificationDocumentId: identificationDocument,
+                privacyConsent: privacyConsent,
             },
         })
 
         return parseStringify(patient)
-    } catch (error) {
-        console.error("registerPatient error:", error)
+    } catch (error: unknown) {
+        if (error && typeof error === "object") {
+            const appwriteError = error as {
+                message?: string
+                code?: number
+                type?: string
+                response?: unknown
+            }
+
+            console.error("registerPatient error:", {
+                message: appwriteError.message,
+                code: appwriteError.code,
+                type: appwriteError.type,
+                response: appwriteError.response,
+            })
+        } else {
+            console.error("registerPatient error:", error)
+        }
+
         throw error
     }
 }

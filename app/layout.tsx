@@ -23,7 +23,7 @@ export default function RootLayout({
   return (
     <html 
       lang="en"  suppressHydrationWarning  className={cn("h-full", "font-sans", FontsSans.variable)}>
-        <body className="min-h-screen  text-white font-sans antialiased">
+        <body className="h-full overflow-hidden text-white font-sans antialiased">
           <ThemeProvider
             attribute="class"
             defaultTheme="dark"

@@ -1,4 +1,6 @@
-﻿@tailwind base;
+﻿@import "react-phone-input-2/lib/style.css";
+
+@tailwind base;
 @tailwind components;
 @tailwind utilities;
 
@@ -52,7 +54,8 @@
 
 
 html, body {
-  min-height: 100%;
+  height: 100%;
+  overflow: hidden;
   margin: 0;
   padding: 0;
   background: #131619;
@@ -171,5 +174,10 @@ html, body {
 .react-datepicker__time-container { border-left: 1px solid #363a3d; }
 
 .react-datepicker__time-list-item { display: flex; align-items: center; }
+
+.react-tel-input .country-list .country:hover,
+.react-tel-input .country-list .country.highlight {
+  background-color: #363a3d !important;
+}
 
 

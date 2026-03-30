@@ -17,6 +17,7 @@ import { Input } from "@/components/ui/input"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Textarea } from "@/components/ui/textarea"
 import { registerPatient } from "@/lib/actions/patient.action"
+import PhoneInput from "react-phone-input-2"
 
 const formSchema = z.object({
   firstName: z
@@ -31,7 +32,17 @@ const formSchema = z.object({
   phone: z
     .string()
     .regex(/^\+[1-9]\d{7,14}$/, "Phone must be in E.164 format, e.g. +14155552671"),
-  birthDate: z.string().min(1, "Birth date is required"),
+  birthDate: z
+    .string()
+    .min(1, "Birth date is required")
+    .refine((value) => {
+      const selectedDate = new Date(`${value}T00:00:00`)
+      if (Number.isNaN(selectedDate.getTime())) return false
+
+      const today = new Date()
+      today.setHours(0, 0, 0, 0)
+      return selectedDate <= today
+    }, "Birth date cannot be in the future"),
   gender: z.enum(["Male", "Female", "Other"], {
     error: "Gender is required",
   }),
@@ -57,6 +68,10 @@ const formSchema = z.object({
 })
 
 const RegisterForm = ({ userId }: { userId: string }) => {
+  const maxBirthDate = new Date(Date.now() - new Date().getTimezoneOffset() * 60000)
+    .toISOString()
+    .split("T")[0]
+
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -122,7 +137,7 @@ const RegisterForm = ({ userId }: { userId: string }) => {
     <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8 w-full">
       <input type="hidden" value={userId} readOnly />
       <FieldSet className="space-y-4">
-        <FieldLegend className="text-lg">Personal Details</FieldLegend>
+        <FieldLegend className="text-2xl font-bold">Personal Details</FieldLegend>
         <div className="grid gap-4 md:grid-cols-2">
           <Field className="grid gap-2">
             <FieldLabel htmlFor="firstName">First Name</FieldLabel>
@@ -141,12 +156,34 @@ const RegisterForm = ({ userId }: { userId: string }) => {
           </Field>
           <Field className="grid gap-2">
             <FieldLabel htmlFor="phone">Phone Number</FieldLabel>
-            <Input id="phone" type="tel" placeholder="+14155552671" {...form.register("phone")} />
+            <Controller
+              control={form.control}
+              name="phone"
+              render={({ field }) => (
+                <PhoneInput
+                  country="us"
+                  enableSearch
+                  value={field.value.replace(/^\+/, "")}
+                  onChange={(value) => field.onChange(value ? `+${value}` : "")}
+                  inputProps={{
+                    id: "phone",
+                    name: field.name,
+                    onBlur: field.onBlur,
+                  }}
+                  containerClass="w-full"
+                  inputClass="!h-8 !w-full !rounded-lg !border !border-input !bg-transparent !pl-12 !text-base !text-foreground placeholder:!text-muted-foreground md:!text-sm"
+                  buttonClass="!rounded-l-lg !border-input !bg-transparent"
+                  dropdownClass="!bg-background !text-foreground"
+                  searchClass="!bg-background !text-foreground"
+                  
+                />
+              )}
+            />
             <FieldError>{form.formState.errors.phone?.message}</FieldError>
           </Field>
           <Field className="grid gap-2">
             <FieldLabel htmlFor="birthDate">Birth Date</FieldLabel>
-            <Input id="birthDate" type="date" {...form.register("birthDate")} />
+            <Input id="birthDate" type="date" max={maxBirthDate} {...form.register("birthDate")} />
             <FieldError>{form.formState.errors.birthDate?.message}</FieldError>
           </Field>
           <Field className="grid gap-2">
@@ -193,7 +230,7 @@ const RegisterForm = ({ userId }: { userId: string }) => {
       </FieldSet>
 
       <FieldSet className="space-y-4">
-        <FieldLegend className="text-lg">Emergency Contact</FieldLegend>
+        <FieldLegend className="text-2xl font-bold">Emergency Contact</FieldLegend>
         <div className="grid gap-4 md:grid-cols-2">
           <Field className="grid gap-2">
             <FieldLabel htmlFor="emergencyContactName">Contact Name</FieldLabel>
@@ -206,11 +243,27 @@ const RegisterForm = ({ userId }: { userId: string }) => {
           </Field>
           <Field className="grid gap-2">
             <FieldLabel htmlFor="emergencyContactNumber">Contact Number</FieldLabel>
-            <Input
-              id="emergencyContactNumber"
-              type="tel"
-              placeholder="+14155552671"
-              {...form.register("emergencyContactNumber")}
+            <Controller
+              control={form.control}
+              name="emergencyContactNumber"
+              render={({ field }) => (
+                <PhoneInput
+                  country="us"
+                  enableSearch
+                  value={field.value.replace(/^\+/, "")}
+                  onChange={(value) => field.onChange(value ? `+${value}` : "")}
+                  inputProps={{
+                    id: "emergencyContactNumber",
+                    name: field.name,
+                    onBlur: field.onBlur,
+                  }}
+                  containerClass="w-full"
+                  inputClass="!h-8 !w-full !rounded-lg !border !border-input !bg-transparent !pl-12 !text-base !text-foreground placeholder:!text-muted-foreground md:!text-sm"
+                  buttonClass="!rounded-l-lg !border-input !bg-transparent"
+                  dropdownClass="!bg-background !text-foreground"
+                  searchClass="!bg-background !text-foreground"
+                />
+              )}
             />
             <FieldError>{form.formState.errors.emergencyContactNumber?.message}</FieldError>
           </Field>
@@ -218,7 +271,7 @@ const RegisterForm = ({ userId }: { userId: string }) => {
       </FieldSet>
 
       <FieldSet className="space-y-4">
-        <FieldLegend className="text-lg">Insurance & Physician</FieldLegend>
+        <FieldLegend className="text-2xl font-bold">Insurance & Physician</FieldLegend>
         <div className="grid gap-4 md:grid-cols-2">
           <Field className="grid gap-2">
             <FieldLabel htmlFor="primaryPhysician">Primary Physician</FieldLabel>
@@ -243,7 +296,7 @@ const RegisterForm = ({ userId }: { userId: string }) => {
       </FieldSet>
 
       <FieldSet className="space-y-4">
-        <FieldLegend className="text-lg">Medical History</FieldLegend>
+        <FieldLegend className="text-2xl font-bold">Medical History</FieldLegend>
         <div className="grid gap-4">
           <Field className="grid gap-2">
             <FieldLabel htmlFor="allergies">Allergies</FieldLabel>
@@ -281,7 +334,7 @@ const RegisterForm = ({ userId }: { userId: string }) => {
       </FieldSet>
 
       <FieldSet className="space-y-4">
-        <FieldLegend className="text-lg">Identification</FieldLegend>
+        <FieldLegend className="text-2xl font-bold">Identification</FieldLegend>
         <div className="grid gap-4 md:grid-cols-2">
           <Field className="grid gap-2">
             <FieldLabel htmlFor="identificationType">Identification Type</FieldLabel>
@@ -308,6 +361,7 @@ const RegisterForm = ({ userId }: { userId: string }) => {
               type="file"
               accept="image/*"
               onChange={(event) => form.setValue("identificationDocument", event.target.files?.[0])}
+              className="h-24 cursor-pointer file:mr-4 file:h-full file:cursor-pointer file:rounded-md file:px-4 file:py-2 file:text-sm"
             />
             <FieldDescription>Upload a clear image of your ID card or passport.</FieldDescription>
             <FieldError>{form.formState.errors.identificationDocument?.message as string | undefined}</FieldError>

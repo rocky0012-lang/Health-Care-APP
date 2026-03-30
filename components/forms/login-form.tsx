@@ -64,9 +64,9 @@ export const LoginForm = ({
           <form className="p-6 " onSubmit={form.handleSubmit(onSubmit)}>
             <FieldGroup>
               <div className="flex flex-col items-center gap-2 text-center">
-                <h1 className="text-5xl font-bold">Welcome back</h1>
+                <h1 className="text-5xl font-bold">Hi there! 👋</h1>
                 <p className="text-balance text-1xl text-muted-foreground">
-                  Login to your Health Care account
+                  Login to your NetCare account
                 </p>
               </div>
               <CustomFormField

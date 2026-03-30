@@ -12,9 +12,9 @@ const RegisterPage = async ({ params }: RegisterPageProps) => {
   const { userId } = await params
         
   return (
-    <div className="flex h-screen max-h-screen">
-      <section className="remove-scrollbar container my-auto">
-        <div className="sub-container max-w-[896px] flex flex-col items-center">
+    <div className="flex h-screen max-h-screen overflow-hidden">
+      <section className="remove-scrollbar flex-1 overflow-y-auto flex flex-col">
+        <div className="w-full max-w-2xl mx-auto flex flex-col items-center flex-1 px-6 py-12">
           <div className="text-24-bold text-center text-dark-dark-900 mb-12 h-10 w-fit">
             NetCare
           </div>
