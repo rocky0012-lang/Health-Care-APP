@@ -12,9 +12,9 @@ const RegisterPage = async ({ params }: RegisterPageProps) => {
   const { userId } = await params
         
   return (
-    <div className="flex h-screen max-h-screen overflow-hidden">
-      <section className="remove-scrollbar flex-1 overflow-y-auto flex flex-col">
-        <div className="w-full max-w-2xl mx-auto flex flex-col items-center flex-1 px-6 py-12">
+    <div className="flex min-h-screen overflow-x-hidden">
+      <section className="flex flex-1 flex-col">
+        <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col items-center px-6 py-10 sm:py-12">
           <div className="text-24-bold text-center text-dark-dark-900 mb-12 h-10 w-fit">
             NetCare
           </div>
@@ -26,7 +26,7 @@ const RegisterPage = async ({ params }: RegisterPageProps) => {
            <RegisterForm userId={userId} />
 
 
-          <div className="text-14-regular mt-20 flex justify-between w-full">
+          <div className="text-14-regular mt-12 flex w-full flex-col gap-3 text-center sm:mt-20 sm:flex-row sm:justify-between sm:text-left">
             <p className="justify-items-end text-dark-dark-600 xl:text-left">
               © 2026 Health Care. All rights reserved.
             </p>
@@ -34,7 +34,7 @@ const RegisterPage = async ({ params }: RegisterPageProps) => {
         </div>
       </section>
 
-      <div className="relative hidden h-screen w-[42%] lg:block">
+      <div className="relative hidden min-h-screen w-[42%] lg:block">
         <Image
           src="/assets/images/register-img.png"
           alt="patient"

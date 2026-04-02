@@ -1,5 +1,6 @@
 "use client"
 
+import { useEffect } from "react"
 import { z } from "zod"
 import { Controller, useForm } from "react-hook-form"
 import { Button } from "@/components/ui/button"
@@ -17,6 +18,8 @@ import { Input } from "@/components/ui/input"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Textarea } from "@/components/ui/textarea"
 import { registerPatient } from "@/lib/actions/patient.action"
+import { setStoredPatientName } from "@/lib/patient-session"
+import { useRouter } from "next/navigation"
 import PhoneInput from "react-phone-input-2"
 
 const formSchema = z.object({
@@ -68,9 +71,15 @@ const formSchema = z.object({
 })
 
 const RegisterForm = ({ userId }: { userId: string }) => {
+  const router = useRouter()
   const maxBirthDate = new Date(Date.now() - new Date().getTimezoneOffset() * 60000)
     .toISOString()
     .split("T")[0]
+
+  useEffect(() => {
+    window.localStorage.setItem("patientUserId", userId)
+    window.localStorage.setItem("pendingPatientUserId", userId)
+  }, [userId])
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -131,6 +140,16 @@ const RegisterForm = ({ userId }: { userId: string }) => {
 
     const patient = await registerPatient(payload)
     console.log("Patient registered:", patient)
+
+    if (patient) {
+      const fullName = `${values.firstName} ${values.lastName}`.trim()
+      if (fullName) {
+        setStoredPatientName(userId, fullName)
+      }
+      window.localStorage.setItem("patientUserId", userId)
+      window.localStorage.removeItem("pendingPatientUserId")
+      router.push("/patientsDashboard")
+    }
   }
 
   return (

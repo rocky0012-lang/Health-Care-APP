@@ -15,7 +15,8 @@ import {
   FieldSeparator,
 } from "@/components/ui/field"
 import CustomFormField from "../CustomFormField"
-import { createUser } from "@/lib/actions/patient.action"
+import { createUser, getPatientByUserId } from "@/lib/actions/patient.action"
+import { setStoredPatientName } from "@/lib/patient-session"
 
 const userFormSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
@@ -48,6 +49,21 @@ export const LoginForm = ({
       const newUser = await createUser(values)
       console.log("User created:", newUser)
       if (newUser?.$id) {
+        window.localStorage.setItem("patientUserId", newUser.$id)
+        window.localStorage.setItem("pendingPatientUserId", newUser.$id)
+        setStoredPatientName(newUser.$id, values.name)
+
+        const existingPatient = await getPatientByUserId(newUser.$id)
+
+        if (existingPatient) {
+          if (existingPatient.name) {
+            setStoredPatientName(newUser.$id, existingPatient.name)
+          }
+          window.localStorage.removeItem("pendingPatientUserId")
+          router.push("/patientsDashboard")
+          return
+        }
+
         router.push(`/patients/${newUser.$id}/register`)
       }
     } catch (error) {
@@ -64,8 +80,8 @@ export const LoginForm = ({
           <form className="p-6 " onSubmit={form.handleSubmit(onSubmit)}>
             <FieldGroup>
               <div className="flex flex-col items-center gap-2 text-center">
-                <h1 className="text-5xl font-bold">Hi there! 👋</h1>
-                <p className="text-balance text-1xl text-muted-foreground">
+                <h1 className="text-4xl font-semibold tracking-tight md:text-5xl">Welcome to NetCare</h1>
+                <p className="max-w-md text-balance text-base text-muted-foreground md:text-lg">
                   Login to your NetCare account
                 </p>
               </div>

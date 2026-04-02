@@ -10,19 +10,19 @@ export default async function Home({searchParams}: {searchParams: Promise<{admin
   const isAdmin = params.admin === "true";
    
   return (
-    <div className="flex h-screen max-h-screen flex-col overflow-hidden lg:flex-row">
+    <div className="flex min-h-screen flex-col overflow-x-hidden lg:flex-row">
       {isAdmin && <PasskeyModal />  }
 
 
-      <section className="remove-scrollbar container flex-1 overflow-y-auto py-10 lg:py-0">
-        <div className="sub-container max-w-[896px] flex flex-col items-center">
+      <section className="container flex-1 py-10 lg:min-h-screen lg:py-0">
+        <div className="sub-container flex min-h-full max-w-[896px] flex-col items-center">
           <div className="text-24-bold text-center text-dark-dark-900 mb-12 h-10 w-fit">
             NetCare
           </div>
          {/* <PatientForm /> */}
            <LoginForm /> 
 
-          <div className="text-14-regular mt-20 flex w-full justify-between pb-8 lg:pb-0">
+          <div className="text-14-regular mt-12 flex w-full flex-col gap-3 pb-8 text-center sm:mt-20 sm:flex-row sm:justify-between sm:text-left lg:pb-0">
             <p className="justify-items-end text-dark-dark-600 xl:text-left">
               © 2026 Health Care. All rights reserved.
             </p>
