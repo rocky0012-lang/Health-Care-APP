@@ -27,7 +27,9 @@ import { Input } from "@/components/ui/input"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Textarea } from "@/components/ui/textarea"
+import { PhoneNumberInput } from "@/components/ui/phone-number-input"
 import { getPatientByUserId, updatePatientProfile } from "@/lib/actions/patient.action"
+import { isE164PhoneNumber } from "@/lib/phone"
 import {
   getStoredPatientAvatar,
   setStoredPatientAvatar,
@@ -115,6 +117,7 @@ export default function ProfilePage() {
   const [isSaving, setIsSaving] = useState(false)
   const [saveMessage, setSaveMessage] = useState("")
   const [errorMessage, setErrorMessage] = useState("")
+  const [phoneError, setPhoneError] = useState("")
 
   useEffect(() => {
     const loadProfile = async () => {
@@ -200,6 +203,23 @@ export default function ProfilePage() {
     setForm((current) => ({ ...current, [name]: value }))
   }
 
+  const handlePhoneChange = (value: string) => {
+    setForm((current) => ({ ...current, phone: value }))
+
+    if (!value || isE164PhoneNumber(value)) {
+      setPhoneError("")
+    }
+  }
+
+  const handlePhoneBlur = () => {
+    if (form.phone && !isE164PhoneNumber(form.phone)) {
+      setPhoneError("Phone must include a valid country code.")
+      return
+    }
+
+    setPhoneError("")
+  }
+
   const handleAvatarChange = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0] || null
     setAvatarFile(file)
@@ -221,9 +241,16 @@ export default function ProfilePage() {
       return
     }
 
+    if (form.phone && !isE164PhoneNumber(form.phone)) {
+      setPhoneError("Phone must include a valid country code.")
+      setErrorMessage("Update the phone number before saving.")
+      return
+    }
+
     setIsSaving(true)
     setSaveMessage("")
     setErrorMessage("")
+    setPhoneError("")
 
     try {
       const payload = new FormData()
@@ -443,7 +470,16 @@ export default function ProfilePage() {
                 </div>
                 <div className="grid gap-2">
                   <label htmlFor="phone" className="text-[0.8rem] font-semibold tracking-[0.02em] text-slate-700 dark:text-slate-200">Phone</label>
-                  <Input id="phone" name="phone" value={form.phone} onChange={handleInputChange} />
+                  <PhoneNumberInput
+                    id="phone"
+                    name="phone"
+                    value={form.phone}
+                    onChange={handlePhoneChange}
+                    onBlur={handlePhoneBlur}
+                    placeholder="Enter phone number"
+                    invalid={Boolean(phoneError)}
+                  />
+                  {phoneError ? <p className="text-sm font-normal text-destructive">{phoneError}</p> : null}
                 </div>
                 <div className="grid gap-2">
                   <label htmlFor="birthDate" className="text-[0.8rem] font-semibold tracking-[0.02em] text-slate-700 dark:text-slate-200">Birth Date</label>

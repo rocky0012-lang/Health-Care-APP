@@ -17,10 +17,10 @@ import {
 import { Input } from "@/components/ui/input"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Textarea } from "@/components/ui/textarea"
+import { PhoneNumberInput } from "@/components/ui/phone-number-input"
 import { registerPatient } from "@/lib/actions/patient.action"
 import { setStoredPatientName } from "@/lib/patient-session"
 import { useRouter } from "next/navigation"
-import PhoneInput from "react-phone-input-2"
 
 const formSchema = z.object({
   firstName: z
@@ -179,22 +179,14 @@ const RegisterForm = ({ userId }: { userId: string }) => {
               control={form.control}
               name="phone"
               render={({ field }) => (
-                <PhoneInput
-                  country="us"
-                  enableSearch
-                  value={field.value.replace(/^\+/, "")}
-                  onChange={(value) => field.onChange(value ? `+${value}` : "")}
-                  inputProps={{
-                    id: "phone",
-                    name: field.name,
-                    onBlur: field.onBlur,
-                  }}
-                  containerClass="w-full"
-                  inputClass="!h-8 !w-full !rounded-lg !border !border-input !bg-transparent !pl-12 !text-base !text-foreground placeholder:!text-muted-foreground md:!text-sm"
-                  buttonClass="!rounded-l-lg !border-input !bg-transparent"
-                  dropdownClass="!bg-background !text-foreground"
-                  searchClass="!bg-background !text-foreground"
-                  
+                <PhoneNumberInput
+                  id="phone"
+                  name={field.name}
+                  value={field.value}
+                  onChange={field.onChange}
+                  onBlur={field.onBlur}
+                  placeholder="Enter phone number"
+                  invalid={Boolean(form.formState.errors.phone)}
                 />
               )}
             />
@@ -266,21 +258,14 @@ const RegisterForm = ({ userId }: { userId: string }) => {
               control={form.control}
               name="emergencyContactNumber"
               render={({ field }) => (
-                <PhoneInput
-                  country="us"
-                  enableSearch
-                  value={field.value.replace(/^\+/, "")}
-                  onChange={(value) => field.onChange(value ? `+${value}` : "")}
-                  inputProps={{
-                    id: "emergencyContactNumber",
-                    name: field.name,
-                    onBlur: field.onBlur,
-                  }}
-                  containerClass="w-full"
-                  inputClass="!h-8 !w-full !rounded-lg !border !border-input !bg-transparent !pl-12 !text-base !text-foreground placeholder:!text-muted-foreground md:!text-sm"
-                  buttonClass="!rounded-l-lg !border-input !bg-transparent"
-                  dropdownClass="!bg-background !text-foreground"
-                  searchClass="!bg-background !text-foreground"
+                <PhoneNumberInput
+                  id="emergencyContactNumber"
+                  name={field.name}
+                  value={field.value}
+                  onChange={field.onChange}
+                  onBlur={field.onBlur}
+                  placeholder="Enter contact number"
+                  invalid={Boolean(form.formState.errors.emergencyContactNumber)}
                 />
               )}
             />

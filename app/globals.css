@@ -114,6 +114,98 @@ html, body {
   font-weight: 500;
 }
 
+.app-phone-field {
+  width: 100% !important;
+}
+
+.app-phone-field .special-label {
+  display: none !important;
+}
+
+.app-phone-field .flag-dropdown {
+  inset: 1px auto 1px 1px !important;
+  width: 2.75rem !important;
+  border: 0 !important;
+  background: transparent !important;
+  border-radius: calc(var(--radius) - 1px) 0 0 calc(var(--radius) - 1px) !important;
+}
+
+.app-phone-field .selected-flag {
+  width: 100% !important;
+  padding: 0 0 0 0.75rem !important;
+  background: transparent !important;
+  border-radius: inherit !important;
+}
+
+.app-phone-field .selected-flag:hover,
+.app-phone-field .selected-flag:focus,
+.app-phone-field .selected-flag:active {
+  background: transparent !important;
+}
+
+.app-phone-field-input {
+  width: 100% !important;
+  height: 2rem !important;
+  min-height: 2rem !important;
+  border: 1px solid hsl(var(--input)) !important;
+  border-radius: 0.5rem !important;
+  background: transparent !important;
+  color: hsl(var(--foreground)) !important;
+  padding-right: 0.625rem !important;
+  padding-left: 3rem !important;
+  font-size: 1rem !important;
+  line-height: 1.25rem !important;
+  box-shadow: none !important;
+  transition: border-color 150ms ease, box-shadow 150ms ease !important;
+}
+
+.app-phone-field-input::placeholder {
+  color: hsl(var(--muted-foreground)) !important;
+}
+
+.app-phone-field:focus-within .app-phone-field-input {
+  border-color: hsl(var(--ring)) !important;
+  box-shadow: 0 0 0 3px hsl(var(--ring) / 0.5) !important;
+}
+
+.app-phone-field-input[aria-invalid="true"] {
+  border-color: hsl(var(--destructive)) !important;
+  box-shadow: 0 0 0 3px hsl(var(--destructive) / 0.2) !important;
+}
+
+.app-phone-field-dropdown {
+  margin-top: 0.5rem !important;
+  border: 1px solid hsl(var(--border)) !important;
+  border-radius: 0.75rem !important;
+  background: hsl(var(--popover)) !important;
+  color: hsl(var(--popover-foreground)) !important;
+  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.14) !important;
+}
+
+.app-phone-field-dropdown .country {
+  color: inherit !important;
+}
+
+.app-phone-field-dropdown .country:hover,
+.app-phone-field-dropdown .country.highlight {
+  background: hsl(var(--accent)) !important;
+}
+
+.app-phone-field-search {
+  width: calc(100% - 1rem) !important;
+  margin: 0.5rem !important;
+  border: 1px solid hsl(var(--input)) !important;
+  border-radius: 0.5rem !important;
+  background: transparent !important;
+  color: hsl(var(--foreground)) !important;
+}
+
+@media (min-width: 768px) {
+  .app-phone-field-input {
+    font-size: 0.875rem !important;
+  }
+}
+
 .input-phone::placeholder,
 .shad-input::placeholder,
 .react-datepicker__input-container input::placeholder {

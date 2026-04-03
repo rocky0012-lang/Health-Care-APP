@@ -2,7 +2,7 @@
 
 import { z } from "zod"
 import { useState } from "react"
-import { useForm } from "react-hook-form"
+import { Controller, useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
@@ -11,9 +11,12 @@ import { Card, CardContent } from "@/components/ui/card"
 import {
   Field,
   FieldDescription,
+  FieldError,
   FieldGroup,
+  FieldLabel,
   FieldSeparator,
 } from "@/components/ui/field"
+import { PhoneNumberInput } from "@/components/ui/phone-number-input"
 import CustomFormField from "../CustomFormField"
 import { createUser, getPatientByUserId } from "@/lib/actions/patient.action"
 import { setStoredPatientName } from "@/lib/patient-session"
@@ -105,16 +108,26 @@ export const LoginForm = ({
                 error={form.formState.errors.email?.message}
                 {...form.register("email")}
               />
-              <CustomFormField
-                id="phone"
-                type="tel"
-                label="Phone"
-                className="text-base"
-                placeholder="+14155552671"
-                required
-                error={form.formState.errors.phone?.message}
-                {...form.register("phone")}
-              />
+              <Field className="grid gap-2">
+                <FieldLabel htmlFor="phone">Phone</FieldLabel>
+                <Controller
+                  control={form.control}
+                  name="phone"
+                  render={({ field }) => (
+                    <PhoneNumberInput
+                      id="phone"
+                      name={field.name}
+                      value={field.value}
+                      onChange={field.onChange}
+                      onBlur={field.onBlur}
+                      placeholder="Enter phone number"
+                      required
+                      invalid={Boolean(form.formState.errors.phone)}
+                    />
+                  )}
+                />
+                <FieldError>{form.formState.errors.phone?.message}</FieldError>
+              </Field>
               <Field>
                 <Button type="submit" className="text-2xl size-35" disabled={isLoading}>
                   {isLoading ? "Creating..." : "Get Started"}
