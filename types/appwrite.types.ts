@@ -28,6 +28,27 @@ export interface Patient extends Models.Document {
   privacyConsent: boolean;
 }
 
+export interface Doctor extends Models.Document {
+  userId: string;
+  fullName: string;
+  email: string;
+  phone: string;
+  gender: Gender;
+  specialty?: string;
+  licenseNumber?: string;
+  experienceYears?: number;
+  hospitalName?: string;
+  availability?: string;
+  profilePhoto?: string;
+  name?: string;
+  specialization?: string;
+  department?: string;
+  avatarUrl?: string;
+  isActive: boolean;
+  accountStatus: DoctorAccountStatus;
+  accountStatusMessage?: string;
+}
+
 export interface Appointment extends Models.Document {
   patient: Patient;
   schedule: Date;

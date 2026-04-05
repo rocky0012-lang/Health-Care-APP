@@ -19,29 +19,29 @@ import {
 } from "@/components/ui/input-otp"
 
 import { Button } from "@/components/ui/button"
-import { encryptKey } from "@/lib/utils"
+import { createAdminSession } from "@/lib/actions/auth-session.action"
 
 const PasskeyModal = () => {
   const router = useRouter()
   const [open, setOpen] = useState(true)
   const [passkey, setPasskey] = useState("")
   const [error, setError] = useState("")
-  const adminPasskey = "567468"
 
   const handleClose = () => {
     setOpen(false)
     router.push("/")
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (encryptKey(passkey) === encryptKey(adminPasskey)) {
-      localStorage.setItem("accessKey", encryptKey(passkey))
+    const result = await createAdminSession(passkey)
+
+    if (result.ok) {
       setOpen(false)
       router.push("/admin")
     } else {
-      setError("Invalid passkey. Please try again.")
+      setError(result.error)
     }
   }
 

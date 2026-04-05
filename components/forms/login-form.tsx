@@ -19,7 +19,16 @@ import {
 import { PhoneNumberInput } from "@/components/ui/phone-number-input"
 import CustomFormField from "../CustomFormField"
 import { createUser, getPatientByUserId } from "@/lib/actions/patient.action"
-import { setStoredPatientName } from "@/lib/patient-session"
+import {
+  activatePatientSession,
+  beginPendingPatientSession,
+} from "@/lib/actions/auth-session.action"
+import {
+  clearPendingPatientUserId,
+  setCurrentPatientUserId,
+  setPendingPatientUserId,
+  setStoredPatientName,
+} from "@/lib/patient-session"
 
 const userFormSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
@@ -52,21 +61,23 @@ export const LoginForm = ({
       const newUser = await createUser(values)
       console.log("User created:", newUser)
       if (newUser?.$id) {
-        window.localStorage.setItem("patientUserId", newUser.$id)
-        window.localStorage.setItem("pendingPatientUserId", newUser.$id)
+        setCurrentPatientUserId(newUser.$id)
+        setPendingPatientUserId(newUser.$id)
         setStoredPatientName(newUser.$id, values.name)
 
         const existingPatient = await getPatientByUserId(newUser.$id)
 
         if (existingPatient) {
+          await activatePatientSession(newUser.$id)
           if (existingPatient.name) {
             setStoredPatientName(newUser.$id, existingPatient.name)
           }
-          window.localStorage.removeItem("pendingPatientUserId")
+          clearPendingPatientUserId()
           router.push("/patientsDashboard")
           return
         }
 
+        await beginPendingPatientSession(newUser.$id)
         router.push(`/patients/${newUser.$id}/register`)
       }
     } catch (error) {

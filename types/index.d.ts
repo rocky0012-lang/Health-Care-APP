@@ -7,6 +7,19 @@ declare type SearchParamProps = {
 
 declare type Gender = "Male" | "Female" | "Other";
 declare type Status = "pending" | "scheduled" | "cancelled";
+declare type UserRole = "admin" | "patient" | "doctor";
+declare type DoctorAccountStatus = "active" | "deactivated" | "suspended";
+declare type DoctorNotificationTone = "default" | "warning" | "success";
+
+declare interface DoctorAdminNotification {
+  id: string;
+  title: string;
+  message: string;
+  tone: DoctorNotificationTone;
+  createdAt: string;
+  kind: "status" | "admin-message";
+  status?: DoctorAccountStatus;
+}
 
 declare interface CreateUserParams {
   name: string;
@@ -15,6 +28,39 @@ declare interface CreateUserParams {
 }
 declare interface User extends CreateUserParams {
   $id: string;
+}
+
+declare interface CreateDoctorAccountParams {
+  fullName: string;
+  email: string;
+  password: string;
+  phone: string;
+}
+
+declare interface CreateDoctorRecordParams {
+  userId: string;
+  fullName: string;
+  email: string;
+  phone: string;
+  gender: Gender;
+  specialty?: string;
+  licenseNumber?: string;
+  experienceYears?: number;
+  hospitalName?: string;
+  availability?: string;
+  profilePhoto?: string;
+  accountStatus: DoctorAccountStatus;
+  accountStatusMessage?: string;
+}
+
+declare interface UpdateDoctorRecordParams extends CreateDoctorRecordParams {
+  doctorId: string;
+  password?: string;
+}
+
+declare interface DoctorLoginParams {
+  email: string;
+  password: string;
 }
 
 declare interface RegisterUserParams extends CreateUserParams {

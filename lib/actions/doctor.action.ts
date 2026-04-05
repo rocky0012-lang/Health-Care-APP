@@ -1,0 +1,621 @@
+"use server"
+
+import { DATABASE_ID, DOCTOR_TABLE_ID, tablesDB, users } from "../appwrite.config"
+import { ID, Query } from "node-appwrite"
+import { parseStringify } from "../utils"
+
+type DoctorStatusPrefs = {
+  accountStatus?: DoctorAccountStatus
+  accountStatusMessage?: string
+  accountStatusMessageUpdatedAt?: string
+  adminNotifications?: DoctorAdminNotification[]
+}
+
+const DEFAULT_DOCTOR_ACCOUNT_STATUS: DoctorAccountStatus = "active"
+const MAX_DOCTOR_ADMIN_NOTIFICATIONS = 20
+
+function normalizeDoctorStatus(status?: string): DoctorAccountStatus {
+  if (status === "deactivated" || status === "suspended") {
+    return status
+  }
+
+  return DEFAULT_DOCTOR_ACCOUNT_STATUS
+}
+
+function normalizeDoctorStatusMessage(message?: string) {
+  const trimmedMessage = message?.trim()
+  return trimmedMessage ? trimmedMessage : undefined
+}
+
+function normalizeDoctorNotificationTone(tone?: string): DoctorNotificationTone {
+  if (tone === "warning" || tone === "success") {
+    return tone
+  }
+
+  return "default"
+}
+
+function normalizeDoctorNotifications(notifications: unknown): DoctorAdminNotification[] {
+  if (!Array.isArray(notifications)) {
+    return []
+  }
+
+  const normalized: DoctorAdminNotification[] = []
+
+  for (const notification of notifications) {
+      if (!notification || typeof notification !== "object") {
+        continue
+      }
+
+      const candidate = notification as Partial<DoctorAdminNotification>
+      const title = typeof candidate.title === "string" ? candidate.title.trim() : ""
+      const message = typeof candidate.message === "string" ? candidate.message.trim() : ""
+      const createdAt = typeof candidate.createdAt === "string" ? candidate.createdAt : ""
+
+      if (!title || !message || !createdAt) {
+        continue
+      }
+
+      normalized.push({
+        id: typeof candidate.id === "string" && candidate.id.trim() ? candidate.id : ID.unique(),
+        title,
+        message,
+        tone: normalizeDoctorNotificationTone(candidate.tone),
+        createdAt,
+        kind: candidate.kind === "status" ? "status" : "admin-message",
+        status:
+          candidate.status === "active" ||
+          candidate.status === "deactivated" ||
+          candidate.status === "suspended"
+            ? candidate.status
+            : undefined,
+      })
+  }
+
+  return normalized
+    .sort((left, right) => Date.parse(right.createdAt) - Date.parse(left.createdAt))
+    .slice(0, MAX_DOCTOR_ADMIN_NOTIFICATIONS)
+}
+
+function buildDoctorNotification({
+  title,
+  message,
+  tone,
+  kind,
+  status,
+}: {
+  title: string
+  message: string
+  tone: DoctorNotificationTone
+  kind: "status" | "admin-message"
+  status?: DoctorAccountStatus
+}): DoctorAdminNotification {
+  return {
+    id: ID.unique(),
+    title: title.trim(),
+    message: message.trim(),
+    tone,
+    createdAt: new Date().toISOString(),
+    kind,
+    status,
+  }
+}
+
+function assertDoctorStatusMessage(status: DoctorAccountStatus, message?: string) {
+  if (normalizeDoctorStatus(status) !== "active" && !normalizeDoctorStatusMessage(message)) {
+    throw new Error("Please provide a reason for suspending or deactivating this doctor.")
+  }
+}
+
+async function getDoctorStatusPrefs(userId: string): Promise<DoctorStatusPrefs> {
+  if (!userId) {
+    return {}
+  }
+
+  try {
+    const prefs = await users.getPrefs<DoctorStatusPrefs>({ userId })
+
+    return {
+      accountStatus: normalizeDoctorStatus(prefs?.accountStatus),
+      accountStatusMessage: normalizeDoctorStatusMessage(prefs?.accountStatusMessage),
+      accountStatusMessageUpdatedAt:
+        typeof prefs?.accountStatusMessageUpdatedAt === "string"
+          ? prefs.accountStatusMessageUpdatedAt
+          : undefined,
+      adminNotifications: normalizeDoctorNotifications(prefs?.adminNotifications),
+    }
+  } catch (error) {
+    console.error("getDoctorStatusPrefs error:", error)
+    return {}
+  }
+}
+
+async function updateDoctorStatusPrefs(
+  userId: string,
+  status: DoctorAccountStatus,
+  message?: string
+) {
+  if (!userId) {
+    return
+  }
+
+  assertDoctorStatusMessage(status, message)
+
+  const existingPrefs = await users
+    .getPrefs<Record<string, any>>({ userId })
+    .catch(() => ({} as Record<string, any>))
+  const normalizedMessage = normalizeDoctorStatusMessage(message)
+  const normalizedNotifications = normalizeDoctorNotifications(existingPrefs.adminNotifications)
+
+  const nextNotifications = normalizedMessage
+    ? [
+        buildDoctorNotification({
+          title:
+            status === "suspended"
+              ? "Account suspended"
+              : status === "deactivated"
+                ? "Account deactivated"
+                : "Account active",
+          message: normalizedMessage,
+          tone: status === "active" ? "success" : "warning",
+          kind: "status",
+          status,
+        }),
+        ...normalizedNotifications,
+      ].slice(0, MAX_DOCTOR_ADMIN_NOTIFICATIONS)
+    : normalizedNotifications
+
+  const nextPrefs = {
+    ...existingPrefs,
+    accountStatus: normalizeDoctorStatus(status),
+    accountStatusMessage: normalizedMessage || "",
+    accountStatusMessageUpdatedAt: normalizedMessage ? new Date().toISOString() : "",
+    adminNotifications: nextNotifications,
+  }
+
+  await users.updatePrefs({
+    userId,
+    prefs: nextPrefs,
+  })
+}
+
+async function withDoctorStatus<T extends Record<string, any>>(doctor: T | null) {
+  if (!doctor) {
+    return null
+  }
+
+  const statusPrefs = await getDoctorStatusPrefs(doctor.userId)
+  const accountStatus = normalizeDoctorStatus(statusPrefs.accountStatus)
+
+  return {
+    ...doctor,
+    accountStatus,
+    accountStatusMessage: statusPrefs.accountStatusMessage,
+    accountStatusMessageUpdatedAt: statusPrefs.accountStatusMessageUpdatedAt,
+    adminNotifications: statusPrefs.adminNotifications || [],
+    isActive: accountStatus === "active",
+  }
+}
+
+function serializeDoctor<T extends Record<string, any>>(doctor: T | null): (T & {
+  avatarUrl: string
+  name: string
+  specialization: string
+  department: string
+  accountStatus: DoctorAccountStatus
+  accountStatusMessage?: string
+  accountStatusMessageUpdatedAt?: string
+  adminNotifications: DoctorAdminNotification[]
+  isActive: boolean
+}) | null {
+  if (!doctor) {
+    return null
+  }
+
+  const accountStatus = normalizeDoctorStatus(doctor.accountStatus)
+
+  return parseStringify({
+    ...doctor,
+    name: doctor.fullName || doctor.name || "",
+    specialization: doctor.specialty || doctor.specialization || "",
+    department: doctor.hospitalName || doctor.department || "",
+    avatarUrl: doctor.profilePhoto || doctor.avatarUrl || "",
+    accountStatus,
+    accountStatusMessage: normalizeDoctorStatusMessage(doctor.accountStatusMessage),
+    accountStatusMessageUpdatedAt:
+      typeof doctor.accountStatusMessageUpdatedAt === "string"
+        ? doctor.accountStatusMessageUpdatedAt
+        : undefined,
+    adminNotifications: normalizeDoctorNotifications(doctor.adminNotifications),
+    isActive: accountStatus === "active",
+  })
+}
+
+function normalizeDoctorEmail(email: string) {
+  return email.trim().toLowerCase()
+}
+
+async function assertDoctorRecordDoesNotExist({
+  userId,
+  email,
+  excludeDoctorId,
+}: {
+  userId: string
+  email: string
+  excludeDoctorId?: string
+}) {
+  const normalizedEmail = normalizeDoctorEmail(email)
+
+  const [existingByUserId, existingByEmail] = await Promise.all([
+    getDoctorByUserId(userId),
+    getDoctorByEmail(normalizedEmail),
+  ])
+
+  if (existingByUserId && existingByUserId.$id !== excludeDoctorId) {
+    throw new Error("A doctor record already exists for this Appwrite user.")
+  }
+
+  if (existingByEmail && existingByEmail.$id !== excludeDoctorId) {
+    throw new Error("A doctor record already exists for this email address.")
+  }
+}
+
+export const getDoctorById = async (doctorId: string) => {
+  if (!DATABASE_ID || !DOCTOR_TABLE_ID) {
+    throw new Error("Missing DATABASE_ID or DOCTOR_TABLE_ID in environment")
+  }
+
+  try {
+    const doctor = await tablesDB.getRow({
+      databaseId: DATABASE_ID,
+      tableId: DOCTOR_TABLE_ID,
+      rowId: doctorId,
+    })
+
+    return serializeDoctor(await withDoctorStatus(doctor))
+  } catch (error) {
+    console.error("getDoctorById error:", error)
+    throw error
+  }
+}
+
+export const createDoctorAccount = async (doctor: CreateDoctorAccountParams) => {
+  const normalizedEmail = normalizeDoctorEmail(doctor.email)
+
+  try {
+    const newDoctorUser = await users.create({
+      userId: ID.unique(),
+      email: normalizedEmail,
+      password: doctor.password,
+      phone: doctor.phone,
+      name: doctor.fullName,
+    })
+
+    return parseStringify(newDoctorUser)
+  } catch (error: any) {
+    if (error?.code === 409) {
+      throw new Error(
+        "An Appwrite user already exists for this doctor email. Use Edit on the existing doctor account to change credentials, or choose a different email address."
+      )
+    }
+
+    console.error("createDoctorAccount error:", error)
+    throw error
+  }
+}
+
+export const createDoctorRecord = async (doctor: CreateDoctorRecordParams) => {
+  if (!DATABASE_ID || !DOCTOR_TABLE_ID) {
+    throw new Error("Missing DATABASE_ID or DOCTOR_TABLE_ID in environment")
+  }
+
+  try {
+    await assertDoctorRecordDoesNotExist({
+      userId: doctor.userId,
+      email: doctor.email,
+    })
+
+    const record = await tablesDB.createRow({
+      databaseId: DATABASE_ID,
+      tableId: DOCTOR_TABLE_ID,
+      rowId: ID.unique(),
+      data: {
+        userId: doctor.userId,
+        fullName: doctor.fullName,
+        email: normalizeDoctorEmail(doctor.email),
+        phone: doctor.phone,
+        gender: doctor.gender,
+        specialty: doctor.specialty,
+        licenseNumber: doctor.licenseNumber,
+        experienceYears: doctor.experienceYears,
+        hospitalName: doctor.hospitalName,
+        availability: doctor.availability,
+        profilePhoto: doctor.profilePhoto,
+        isActive: normalizeDoctorStatus(doctor.accountStatus) === "active",
+      },
+    })
+
+    await updateDoctorStatusPrefs(doctor.userId, doctor.accountStatus, doctor.accountStatusMessage)
+
+    return serializeDoctor(await withDoctorStatus(record))
+  } catch (error) {
+    console.error("createDoctorRecord error:", error)
+    throw error
+  }
+}
+
+export const uploadDoctorAvatar = async () => {
+  throw new Error("Doctor profile photos are now stored in the profilePhoto URL column.")
+}
+
+export const getDoctorByUserId = async (userId: string) => {
+  if (!DATABASE_ID || !DOCTOR_TABLE_ID) {
+    throw new Error("Missing DATABASE_ID or DOCTOR_TABLE_ID in environment")
+  }
+
+  try {
+    const response = await tablesDB.listRows({
+      databaseId: DATABASE_ID,
+      tableId: DOCTOR_TABLE_ID,
+      queries: [Query.equal("userId", [userId])],
+    })
+
+    const doctor = response.rows?.[0]
+
+    if (!doctor) {
+      return null
+    }
+
+    return serializeDoctor(await withDoctorStatus(doctor))
+  } catch (error) {
+    console.error("getDoctorByUserId error:", error)
+    throw error
+  }
+}
+
+export const getDoctorByEmail = async (email: string) => {
+  if (!DATABASE_ID || !DOCTOR_TABLE_ID) {
+    throw new Error("Missing DATABASE_ID or DOCTOR_TABLE_ID in environment")
+  }
+
+  try {
+    const normalizedEmail = normalizeDoctorEmail(email)
+    const response = await tablesDB.listRows({
+      databaseId: DATABASE_ID,
+      tableId: DOCTOR_TABLE_ID,
+      queries: [Query.equal("email", [normalizedEmail])],
+    })
+
+    const doctor = response.rows?.[0]
+
+    if (!doctor) {
+      return null
+    }
+
+    return serializeDoctor(await withDoctorStatus(doctor))
+  } catch (error) {
+    console.error("getDoctorByEmail error:", error)
+    throw error
+  }
+}
+
+export const listDoctors = async (limit = 6) => {
+  if (!DATABASE_ID || !DOCTOR_TABLE_ID) {
+    throw new Error("Missing DATABASE_ID or DOCTOR_TABLE_ID in environment")
+  }
+
+  try {
+    const response = await tablesDB.listRows({
+      databaseId: DATABASE_ID,
+      tableId: DOCTOR_TABLE_ID,
+      queries: [Query.orderDesc("$createdAt"), Query.limit(limit)],
+    })
+
+    const doctorsWithStatus = await Promise.all(response.rows.map((doctor) => withDoctorStatus(doctor)))
+
+    return doctorsWithStatus
+      .map((doctor) => serializeDoctor(doctor))
+      .filter((doctor): doctor is NonNullable<typeof doctor> => Boolean(doctor))
+  } catch (error) {
+    console.error("listDoctors error:", error)
+    throw error
+  }
+}
+
+export const provisionDoctor = async (
+  account: CreateDoctorAccountParams,
+  record: Omit<CreateDoctorRecordParams, "userId" | "fullName" | "email" | "phone">
+) => {
+  const doctorUser = await createDoctorAccount(account)
+
+  const doctorRecord = await createDoctorRecord({
+    userId: doctorUser.$id,
+    fullName: account.fullName,
+    email: account.email,
+    phone: account.phone,
+    ...record,
+  })
+
+  return parseStringify({
+    account: doctorUser,
+    record: doctorRecord,
+  })
+}
+
+export const getDoctorLoginRecord = async ({ email }: { email: string }) => {
+  const doctor = await getDoctorByEmail(email)
+
+  if (!doctor) {
+    return null
+  }
+
+  return {
+    userId: doctor.userId,
+    email: doctor.email,
+    name: doctor.name || doctor.fullName,
+    accountStatus: doctor.accountStatus,
+    accountStatusMessage: doctor.accountStatusMessage,
+    accountStatusMessageUpdatedAt: doctor.accountStatusMessageUpdatedAt,
+    adminNotifications: doctor.adminNotifications,
+    isActive: doctor.accountStatus === "active",
+  }
+}
+
+export const sendDoctorNotification = async ({
+  userId,
+  title,
+  message,
+}: {
+  userId: string
+  title?: string
+  message: string
+}) => {
+  const normalizedMessage = normalizeDoctorStatusMessage(message)
+  const normalizedTitle = title?.trim() || "Admin message"
+
+  if (!userId) {
+    throw new Error("Missing doctor userId for notification delivery.")
+  }
+
+  if (!normalizedMessage) {
+    throw new Error("Enter a notification message before sending it to the doctor.")
+  }
+
+  const existingPrefs = await users
+    .getPrefs<Record<string, any>>({ userId })
+    .catch(() => ({} as Record<string, any>))
+  const normalizedNotifications = normalizeDoctorNotifications(existingPrefs.adminNotifications)
+
+  const nextPrefs = {
+    ...existingPrefs,
+    adminNotifications: [
+      buildDoctorNotification({
+        title: normalizedTitle,
+        message: normalizedMessage,
+        tone: "default",
+        kind: "admin-message",
+      }),
+      ...normalizedNotifications,
+    ].slice(0, MAX_DOCTOR_ADMIN_NOTIFICATIONS),
+  }
+
+  await users.updatePrefs({
+    userId,
+    prefs: nextPrefs,
+  })
+
+  return parseStringify(nextPrefs.adminNotifications[0])
+}
+
+export const updateDoctorAccountStatus = async ({
+  doctorId,
+  userId,
+  accountStatus,
+  accountStatusMessage,
+}: {
+  doctorId: string
+  userId: string
+  accountStatus: DoctorAccountStatus
+  accountStatusMessage?: string
+}) => {
+  if (!DATABASE_ID || !DOCTOR_TABLE_ID) {
+    throw new Error("Missing DATABASE_ID or DOCTOR_TABLE_ID in environment")
+  }
+
+  const normalizedStatus = normalizeDoctorStatus(accountStatus)
+  const normalizedMessage = normalizeDoctorStatusMessage(accountStatusMessage)
+
+  await updateDoctorStatusPrefs(userId, normalizedStatus, normalizedMessage)
+
+  const updatedDoctor = await tablesDB.updateRow({
+    databaseId: DATABASE_ID,
+    tableId: DOCTOR_TABLE_ID,
+    rowId: doctorId,
+    data: {
+      isActive: normalizedStatus === "active",
+    },
+  })
+
+  return serializeDoctor(await withDoctorStatus(updatedDoctor))
+}
+
+export const updateDoctorRecord = async (doctor: UpdateDoctorRecordParams) => {
+  if (!DATABASE_ID || !DOCTOR_TABLE_ID) {
+    throw new Error("Missing DATABASE_ID or DOCTOR_TABLE_ID in environment")
+  }
+
+  const existingDoctor = await getDoctorById(doctor.doctorId)
+
+  if (!existingDoctor) {
+    throw new Error("Doctor record not found.")
+  }
+
+  await assertDoctorRecordDoesNotExist({
+    userId: doctor.userId,
+    email: doctor.email,
+    excludeDoctorId: doctor.doctorId,
+  })
+
+  const normalizedEmail = normalizeDoctorEmail(doctor.email)
+
+  if ((existingDoctor.fullName || "") !== doctor.fullName) {
+    await users.updateName({
+      userId: doctor.userId,
+      name: doctor.fullName,
+    })
+  }
+
+  if ((existingDoctor.email || "") !== normalizedEmail) {
+    await users.updateEmail({
+      userId: doctor.userId,
+      email: normalizedEmail,
+    })
+  }
+
+  if ((existingDoctor.phone || "") !== doctor.phone) {
+    await users.updatePhone({
+      userId: doctor.userId,
+      number: doctor.phone,
+    })
+  }
+
+  if (doctor.password && doctor.password.trim().length > 0) {
+    await users.updatePassword({
+      userId: doctor.userId,
+      password: doctor.password,
+    })
+  }
+
+  try {
+    await updateDoctorStatusPrefs(
+      doctor.userId,
+      doctor.accountStatus,
+      doctor.accountStatusMessage
+    )
+
+    const updatedDoctor = await tablesDB.updateRow({
+      databaseId: DATABASE_ID,
+      tableId: DOCTOR_TABLE_ID,
+      rowId: doctor.doctorId,
+      data: {
+        userId: doctor.userId,
+        fullName: doctor.fullName,
+        email: normalizedEmail,
+        phone: doctor.phone,
+        gender: doctor.gender,
+        specialty: doctor.specialty,
+        licenseNumber: doctor.licenseNumber,
+        experienceYears: doctor.experienceYears,
+        hospitalName: doctor.hospitalName,
+        availability: doctor.availability,
+        profilePhoto: doctor.profilePhoto,
+        isActive: normalizeDoctorStatus(doctor.accountStatus) === "active",
+      },
+    })
+
+    return serializeDoctor(await withDoctorStatus(updatedDoctor))
+  } catch (error) {
+    console.error("updateDoctorRecord error:", error)
+    throw error
+  }
+}

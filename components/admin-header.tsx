@@ -1,17 +1,30 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { Bell, Globe, Settings, UserRound } from "lucide-react"
+import { Bell, Globe, LogOut, Settings, UserRound } from "lucide-react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { useRef } from "react"
 import { SidebarTrigger } from "@/components/ui/sidebar"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import {
+  clearAdminSession,
+  clearDoctorSessionCookie,
+  clearPatientSessions,
+} from "@/lib/actions/auth-session.action"
 import { getPatientByUserId } from "@/lib/actions/patient.action"
 import {
+  clearPatientSession,
   getCurrentPatientUserId,
   getStoredPatientAvatar,
   setStoredPatientAvatar,
 } from "@/lib/patient-session"
+import {
+  clearDoctorSession,
+  getCurrentDoctorUserId,
+  getStoredDoctorAvatar,
+} from "@/lib/doctor-session"
+import { getDoctorByUserId } from "@/lib/actions/doctor.action"
 import {
   Drawer,
   DrawerClose,
@@ -26,6 +39,13 @@ interface AdminHeaderProps {
   pageTitle: string
   pageDescription: string
   notificationCount?: number
+  notifications?: Array<{
+    id: string
+    title: string
+    message: string
+    createdAt?: string
+    tone?: "default" | "warning" | "success"
+  }>
   userRole?: string
   avatarInitials?: string
   welcomeName?: string
@@ -36,7 +56,8 @@ interface AdminHeaderProps {
 export function AdminHeader({
   pageTitle,
   pageDescription,
-  notificationCount = 4,
+  notificationCount = 0,
+  notifications = [],
   userRole = "Admin",
   avatarInitials = "AD",
   welcomeName,
@@ -48,11 +69,16 @@ export function AdminHeader({
   const [resolvedWelcomeName, setResolvedWelcomeName] = useState(welcomeName || userRole)
   const [selectedLanguage, setSelectedLanguage] = useState("English")
   const [isLanguageMenuOpen, setIsLanguageMenuOpen] = useState(false)
+  const [isNotificationMenuOpen, setIsNotificationMenuOpen] = useState(false)
   const languageMenuRef = useRef<HTMLDivElement | null>(null)
+  const notificationMenuRef = useRef<HTMLDivElement | null>(null)
+  const router = useRouter()
   const isAdminRole = userRole.toLowerCase() === "admin"
-  const profileHref = isAdminRole ? "/admin/profile" : "/profile"
-  const settingsHref = isAdminRole ? "/admin/settings" : "/settings"
+  const isDoctorRole = userRole.toLowerCase() === "doctor"
+  const profileHref = isAdminRole ? "/admin/profile" : isDoctorRole ? "/doctor/profile" : "/profile"
+  const settingsHref = isAdminRole ? "/admin/settings" : isDoctorRole ? "/doctor/settings" : "/settings"
   const languageOptions = ["English", "French", "Spanish", "Swahili"]
+  const resolvedNotificationCount = notifications.length > 0 ? notifications.length : notificationCount
   const derivedAvatarInitials = (resolvedWelcomeName || userRole)
     .split(/\s+/)
     .filter(Boolean)
@@ -85,6 +111,47 @@ export function AdminHeader({
       setAvatarImage("")
       setResolvedWelcomeName(welcomeName || userRole)
       return
+    }
+
+    if (isDoctorRole) {
+      const currentUserId = getCurrentDoctorUserId()
+      const storedAvatar = getStoredDoctorAvatar(currentUserId)
+      const hasLocalAvatar = storedAvatar.startsWith("data:")
+
+      if (hasLocalAvatar) {
+        setAvatarImage(storedAvatar)
+      } else {
+        setAvatarImage("")
+      }
+
+      if (!currentUserId) {
+        return
+      }
+
+      let isMounted = true
+
+      const loadDoctorAvatar = async () => {
+        try {
+          const doctor = await getDoctorByUserId(currentUserId)
+          if (!isMounted || !doctor) {
+            return
+          }
+          if (doctor.name) {
+            setResolvedWelcomeName(doctor.name)
+          }
+          if (!hasLocalAvatar && doctor.avatarUrl) {
+            setAvatarImage(doctor.avatarUrl)
+          }
+        } catch (error) {
+          console.error("Failed to load doctor avatar", error)
+        }
+      }
+
+      void loadDoctorAvatar()
+
+      return () => {
+        isMounted = false
+      }
     }
 
     const currentUserId = getCurrentPatientUserId()
@@ -127,7 +194,7 @@ export function AdminHeader({
     return () => {
       isMounted = false
     }
-  }, [isAdminRole, userRole, welcomeName])
+  }, [isAdminRole, isDoctorRole, userRole, welcomeName])
 
   useEffect(() => {
     const handlePointerDown = (event: MouseEvent) => {
@@ -137,11 +204,50 @@ export function AdminHeader({
       ) {
         setIsLanguageMenuOpen(false)
       }
+
+      if (
+        notificationMenuRef.current &&
+        !notificationMenuRef.current.contains(event.target as Node)
+      ) {
+        setIsNotificationMenuOpen(false)
+      }
     }
 
     window.addEventListener("mousedown", handlePointerDown)
     return () => window.removeEventListener("mousedown", handlePointerDown)
   }, [])
+
+  const handleLogout = async () => {
+    if (isDoctorRole) {
+      const endpoint = process.env.NEXT_PUBLIC_ENDPOINT || ""
+      const projectId = process.env.NEXT_PUBLIC_PROJECT_ID || ""
+      if (endpoint && projectId) {
+        try {
+          await fetch(`${endpoint.replace(/\/$/,"")}/account/sessions/current`, {
+            method: "DELETE",
+            headers: { "X-Appwrite-Project": projectId },
+            credentials: "include",
+          })
+        } catch (error) {
+          console.error("Failed to clear doctor session", error)
+        }
+      }
+      await clearDoctorSessionCookie()
+      clearDoctorSession()
+      router.push("/doctor/login")
+      return
+    }
+
+    if (isAdminRole) {
+      await clearAdminSession()
+      router.push("/")
+      return
+    }
+
+    await clearPatientSessions()
+    clearPatientSession()
+    router.push("/")
+  }
 
   return (
     <div className="border-b border-border/60">
@@ -203,17 +309,55 @@ export function AdminHeader({
             )}
           </div>
 
-          <button
-            className="relative rounded-md p-2 text-muted-foreground hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-            title="Notifications"
-          >
-            <Bell className="size-5" />
-            {notificationCount > 0 && (
-              <span className="absolute -top-0.5 -right-0.5 flex size-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white leading-none">
-                {notificationCount > 9 ? "9+" : notificationCount}
-              </span>
+          <div className="relative" ref={notificationMenuRef}>
+            <button
+              className="relative rounded-md p-2 text-muted-foreground transition-colors hover:bg-slate-100 dark:hover:bg-slate-800"
+              title="Notifications"
+              type="button"
+              onClick={() => setIsNotificationMenuOpen((open) => !open)}
+            >
+              <Bell className="size-5" />
+              {resolvedNotificationCount > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 flex size-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white leading-none">
+                  {resolvedNotificationCount > 9 ? "9+" : resolvedNotificationCount}
+                </span>
+              )}
+            </button>
+
+            {isNotificationMenuOpen && (
+              <div className="absolute right-0 top-12 z-50 w-80 max-w-[calc(100vw-2rem)] rounded-lg border border-border bg-white p-2 shadow-lg dark:bg-slate-950">
+                <p className="px-2 py-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Notifications
+                </p>
+                {notifications.length === 0 ? (
+                  <div className="px-2 py-3 text-sm text-muted-foreground">No new messages.</div>
+                ) : (
+                  <div className="mt-1 flex max-h-80 flex-col gap-2 overflow-y-auto">
+                    {notifications.map((notification) => {
+                      const toneClass =
+                        notification.tone === "warning"
+                          ? "border-amber-200 bg-amber-50 dark:border-amber-900/50 dark:bg-amber-950/20"
+                          : notification.tone === "success"
+                            ? "border-emerald-200 bg-emerald-50 dark:border-emerald-900/50 dark:bg-emerald-950/20"
+                            : "border-border bg-slate-50 dark:bg-slate-900/60"
+
+                      return (
+                        <div key={notification.id} className={`rounded-lg border px-3 py-3 ${toneClass}`}>
+                          <p className="text-sm font-semibold text-foreground">{notification.title}</p>
+                          <p className="mt-1 text-sm text-muted-foreground">{notification.message}</p>
+                          {notification.createdAt && (
+                            <p className="mt-2 text-xs text-muted-foreground">
+                              {new Date(notification.createdAt).toLocaleString()}
+                            </p>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
             )}
-          </button>
+          </div>
 
           <Drawer direction="right">
             <DrawerTrigger asChild>
@@ -252,6 +396,18 @@ export function AdminHeader({
                     <Settings className="size-4" />
                     <span>Settings</span>
                   </Link>
+                </DrawerClose>
+                <DrawerClose asChild>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void handleLogout()
+                    }}
+                    className="flex items-center gap-3 rounded-lg border border-border px-4 py-3 text-sm text-red-600 transition-colors hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/30"
+                  >
+                    <LogOut className="size-4" />
+                    <span>Log out</span>
+                  </button>
                 </DrawerClose>
               </div>
             </DrawerContent>

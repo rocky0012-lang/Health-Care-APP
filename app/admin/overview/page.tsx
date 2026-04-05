@@ -7,6 +7,7 @@ import {
   ClipboardList,
   LayoutDashboard,
   LogOut,
+  Stethoscope,
   Users,
 } from "lucide-react"
 import {
@@ -38,6 +39,7 @@ import {
 const navItems = [
   { label: "Overview", href: "/admin/overview", icon: LayoutDashboard },
   { label: "Patients", href: "/admin/patients", icon: Users },
+  { label: "Doctors", href: "/admin/doctors", icon: Stethoscope },
   { label: "Appointments", href: "/admin/appointments", icon: CalendarDays },
   { label: "Reports", href: "/admin/reports", icon: ClipboardList },
 ]
@@ -116,7 +118,7 @@ export default function OverviewPage() {
           <Card className="bg-blue-50/80 dark:bg-blue-950/30">
             <CardHeader>
               <CardDescription>Patients</CardDescription>
-              <CardTitle>124 registered</CardTitle>
+              <CardTitle>0 registered</CardTitle>
               <CardAction>
                 <div className="rounded-full bg-white/80 p-2 dark:bg-slate-900/80">
                   <Users className="size-5 text-blue-600" />
@@ -132,7 +134,7 @@ export default function OverviewPage() {
           <Card className="bg-emerald-50/80 dark:bg-emerald-950/30">
             <CardHeader>
               <CardDescription>Appointments</CardDescription>
-              <CardTitle>18 scheduled today</CardTitle>
+              <CardTitle>0 scheduled today</CardTitle>
               <CardAction>
                 <div className="rounded-full bg-white/80 p-2 dark:bg-slate-900/80">
                   <CalendarDays className="size-5 text-emerald-600" />
@@ -148,7 +150,7 @@ export default function OverviewPage() {
           <Card className="bg-amber-50/80 dark:bg-amber-950/30">
             <CardHeader>
               <CardDescription>Reports</CardDescription>
-              <CardTitle>3 pending reviews</CardTitle>
+              <CardTitle>0 pending reviews</CardTitle>
               <CardAction>
                 <div className="rounded-full bg-white/80 p-2 dark:bg-slate-900/80">
                   <Activity className="size-5 text-amber-600" />

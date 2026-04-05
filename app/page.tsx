@@ -26,9 +26,14 @@ export default async function Home({searchParams}: {searchParams: Promise<{admin
             <p className="justify-items-end text-dark-dark-600 xl:text-left">
               © 2026 Health Care. All rights reserved.
             </p>
-            <Link href="/?admin=true" className="text-green-500">
-              Admin
-            </Link>
+            <div className="flex gap-4">
+              <Link href="/doctor/login" className="text-blue-500">
+                Doctor
+              </Link>
+              <Link href="/?admin=true" className="text-green-500">
+                Admin
+              </Link>
+            </div>
           </div>
           
           

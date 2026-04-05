@@ -6,6 +6,7 @@ import {
   ClipboardList,
   LayoutDashboard,
   LogOut,
+  Stethoscope,
   Users,
 } from "lucide-react"
 import {
@@ -36,6 +37,7 @@ import {
 const navItems = [
   { label: "Overview", href: "/admin/overview", icon: LayoutDashboard },
   { label: "Patients", href: "/admin/patients", icon: Users },
+  { label: "Doctors", href: "/admin/doctors", icon: Stethoscope },
   { label: "Appointments", href: "/admin/appointments", icon: CalendarDays },
   { label: "Reports", href: "/admin/reports", icon: ClipboardList },
 ]
@@ -114,7 +116,7 @@ export default function PatientsPage() {
           <Card>
             <CardHeader>
               <CardDescription>Total Registered</CardDescription>
-              <CardTitle>124 patients</CardTitle>
+              <CardTitle>0 patients</CardTitle>
             </CardHeader>
             <CardContent>
               <p className="text-sm text-muted-foreground">
@@ -125,7 +127,7 @@ export default function PatientsPage() {
           <Card>
             <CardHeader>
               <CardDescription>Active Today</CardDescription>
-              <CardTitle>28 patients</CardTitle>
+              <CardTitle>0 patients</CardTitle>
             </CardHeader>
             <CardContent>
               <p className="text-sm text-muted-foreground">

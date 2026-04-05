@@ -18,8 +18,14 @@ import { Input } from "@/components/ui/input"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Textarea } from "@/components/ui/textarea"
 import { PhoneNumberInput } from "@/components/ui/phone-number-input"
+import { activatePatientSession } from "@/lib/actions/auth-session.action"
 import { registerPatient } from "@/lib/actions/patient.action"
-import { setStoredPatientName } from "@/lib/patient-session"
+import {
+  clearPendingPatientUserId,
+  setCurrentPatientUserId,
+  setPendingPatientUserId,
+  setStoredPatientName,
+} from "@/lib/patient-session"
 import { useRouter } from "next/navigation"
 
 const formSchema = z.object({
@@ -77,8 +83,8 @@ const RegisterForm = ({ userId }: { userId: string }) => {
     .split("T")[0]
 
   useEffect(() => {
-    window.localStorage.setItem("patientUserId", userId)
-    window.localStorage.setItem("pendingPatientUserId", userId)
+    setCurrentPatientUserId(userId)
+    setPendingPatientUserId(userId)
   }, [userId])
 
   const form = useForm<z.infer<typeof formSchema>>({
@@ -142,12 +148,13 @@ const RegisterForm = ({ userId }: { userId: string }) => {
     console.log("Patient registered:", patient)
 
     if (patient) {
+      await activatePatientSession(userId)
       const fullName = `${values.firstName} ${values.lastName}`.trim()
       if (fullName) {
         setStoredPatientName(userId, fullName)
       }
-      window.localStorage.setItem("patientUserId", userId)
-      window.localStorage.removeItem("pendingPatientUserId")
+      setCurrentPatientUserId(userId)
+      clearPendingPatientUserId()
       router.push("/patientsDashboard")
     }
   }

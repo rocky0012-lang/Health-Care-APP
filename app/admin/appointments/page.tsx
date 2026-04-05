@@ -6,6 +6,7 @@ import {
   ClipboardList,
   LayoutDashboard,
   LogOut,
+  Stethoscope,
   Users,
 } from "lucide-react"
 import {
@@ -36,6 +37,7 @@ import {
 const navItems = [
   { label: "Overview", href: "/admin/overview", icon: LayoutDashboard },
   { label: "Patients", href: "/admin/patients", icon: Users },
+  { label: "Doctors", href: "/admin/doctors", icon: Stethoscope },
   { label: "Appointments", href: "/admin/appointments", icon: CalendarDays },
   { label: "Reports", href: "/admin/reports", icon: ClipboardList },
 ]

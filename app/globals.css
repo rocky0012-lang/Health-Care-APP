@@ -115,6 +115,7 @@ html, body {
 }
 
 .app-phone-field {
+  position: relative !important;
   width: 100% !important;
 }
 
@@ -122,37 +123,67 @@ html, body {
   display: none !important;
 }
 
-.app-phone-field .flag-dropdown {
+.app-phone-field-button {
   inset: 1px auto 1px 1px !important;
-  width: 2.75rem !important;
+  width: 2.55rem !important;
+  height: calc(100% - 2px) !important;
   border: 0 !important;
   background: transparent !important;
   border-radius: calc(var(--radius) - 1px) 0 0 calc(var(--radius) - 1px) !important;
 }
 
-.app-phone-field .selected-flag {
+.app-phone-field-button .selected-flag {
+  position: relative !important;
   width: 100% !important;
-  padding: 0 0 0 0.75rem !important;
+  height: 100% !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  gap: 0.3rem !important;
+  padding: 0 0.35rem 0 0.45rem !important;
   background: transparent !important;
   border-radius: inherit !important;
 }
 
-.app-phone-field .selected-flag:hover,
-.app-phone-field .selected-flag:focus,
-.app-phone-field .selected-flag:active {
+.app-phone-field-button .selected-flag .flag {
+  position: static !important;
+  top: auto !important;
+  left: auto !important;
+  margin-top: 0 !important;
+  transform: none !important;
+  flex: 0 0 auto !important;
+}
+
+.app-phone-field-button .selected-flag .arrow {
+  position: static !important;
+  top: auto !important;
+  right: auto !important;
+  left: auto !important;
+  margin-top: 1px !important;
+  border-left-width: 4px !important;
+  border-right-width: 4px !important;
+  border-top-width: 5px !important;
+  border-top-color: hsl(var(--muted-foreground)) !important;
+  flex: 0 0 auto !important;
+}
+
+.app-phone-field-button .selected-flag:hover,
+.app-phone-field-button .selected-flag:focus,
+.app-phone-field-button .selected-flag:active {
   background: transparent !important;
 }
 
 .app-phone-field-input {
   width: 100% !important;
-  height: 2rem !important;
-  min-height: 2rem !important;
+  height: 2.5rem !important;
+  min-height: 2.5rem !important;
   border: 1px solid hsl(var(--input)) !important;
   border-radius: 0.5rem !important;
   background: transparent !important;
   color: hsl(var(--foreground)) !important;
   padding-right: 0.625rem !important;
-  padding-left: 3rem !important;
+  padding-left: 3.1rem !important;
+  padding-left: 4rem !important;
   font-size: 1rem !important;
   line-height: 1.25rem !important;
   box-shadow: none !important;

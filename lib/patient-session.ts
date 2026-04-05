@@ -19,6 +19,30 @@ export function getCurrentPatientUserId() {
   )
 }
 
+export function setCurrentPatientUserId(userId: string) {
+  if (!canUseStorage() || !userId) {
+    return
+  }
+
+  window.localStorage.setItem(CURRENT_PATIENT_USER_KEY, userId)
+}
+
+export function setPendingPatientUserId(userId: string) {
+  if (!canUseStorage() || !userId) {
+    return
+  }
+
+  window.localStorage.setItem(PENDING_PATIENT_USER_KEY, userId)
+}
+
+export function clearPendingPatientUserId() {
+  if (!canUseStorage()) {
+    return
+  }
+
+  window.localStorage.removeItem(PENDING_PATIENT_USER_KEY)
+}
+
 export function getPatientNameStorageKey(userId: string) {
   return `patientName:${userId}`
 }
@@ -71,4 +95,24 @@ export function setStoredPatientAvatar(userId: string, avatarDataUrl: string) {
   }
 
   window.localStorage.setItem(getPatientAvatarStorageKey(userId), avatarDataUrl)
+}
+
+export function clearPatientSession(userId?: string) {
+  if (!canUseStorage()) {
+    return
+  }
+
+  const resolvedUserId = userId || getCurrentPatientUserId()
+
+  window.localStorage.removeItem(CURRENT_PATIENT_USER_KEY)
+  window.localStorage.removeItem(PENDING_PATIENT_USER_KEY)
+  window.localStorage.removeItem(CURRENT_PATIENT_NAME_KEY)
+  window.localStorage.removeItem(LEGACY_PATIENT_AVATAR_KEY)
+
+  if (!resolvedUserId) {
+    return
+  }
+
+  window.localStorage.removeItem(getPatientNameStorageKey(resolvedUserId))
+  window.localStorage.removeItem(getPatientAvatarStorageKey(resolvedUserId))
 }
