@@ -2,14 +2,16 @@
 
 import Link from "next/link"
 import {
-  Activity,
   CalendarDays,
   ClipboardList,
+  Clock,
   LayoutDashboard,
   LogOut,
   Stethoscope,
   Users,
 } from "lucide-react"
+
+import { AdminHeader } from "@/components/admin-header"
 import {
   Sidebar,
   SidebarContent,
@@ -23,11 +25,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarProvider,
-  SidebarTrigger,
 } from "@/components/ui/sidebar"
-import { AdminHeader } from "@/components/admin-header"
-import { adminHeaderNavItems } from "@/lib/admin-navigation"
-import { Button } from "@/components/ui/button"
 import {
   Card,
   CardAction,
@@ -36,16 +34,18 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
+import { adminHeaderNavItems } from "@/lib/admin-navigation"
 
 const navItems = [
   { label: "Overview", href: "/admin/overview", icon: LayoutDashboard },
   { label: "Patients", href: "/admin/patients", icon: Users },
   { label: "Doctors", href: "/admin/doctors", icon: Stethoscope },
   { label: "Appointments", href: "/admin/appointments", icon: CalendarDays },
+  { label: "Schedule", href: "/admin/schedule", icon: Clock },
   { label: "Reports", href: "/admin/reports", icon: ClipboardList },
 ]
 
-export default function OverviewPage() {
+export default function AdminSchedulePage() {
   return (
     <SidebarProvider className="min-h-screen w-full flex-row items-stretch">
       <Sidebar
@@ -72,7 +72,7 @@ export default function OverviewPage() {
             <SidebarGroupContent>
               <SidebarMenu className="flex-col gap-1">
                 {navItems.map((item) => {
-                  const isActive = item.href === "/admin/overview";
+                  const isActive = item.href === "/admin/schedule"
                   return (
                     <SidebarMenuItem key={item.label}>
                       <div className={`rounded-md transition-colors ${
@@ -111,60 +111,56 @@ export default function OverviewPage() {
 
       <SidebarInset className="min-h-screen flex-1 bg-slate-50/50 dark:bg-slate-950">
         <AdminHeader
-          pageTitle="Overview"
-          pageDescription="Dashboard overview and key metrics."
+          pageTitle="Schedule"
+          pageDescription="Review clinic schedule coverage, staffing windows, and operating blocks."
           subNavItems={adminHeaderNavItems.map((item) => ({
             ...item,
-            active: item.href === "/admin/overview",
+            active: item.href === "/admin/schedule",
           }))}
         />
 
         <section className="grid gap-4 p-4 md:grid-cols-3 md:p-6">
           <Card className="bg-blue-50/80 dark:bg-blue-950/30">
             <CardHeader>
-              <CardDescription>Patients</CardDescription>
-              <CardTitle>0 registered</CardTitle>
+              <CardDescription>Clinic Hours</CardDescription>
+              <CardTitle>Mon-Fri coverage</CardTitle>
               <CardAction>
-                <div className="rounded-full bg-white/80 p-2 dark:bg-slate-900/80">
-                  <Users className="size-5 text-blue-600" />
-                </div>
+                <Clock className="size-5 text-blue-600" />
               </CardAction>
             </CardHeader>
             <CardContent>
               <p className="text-sm text-muted-foreground">
-                Active patient records available for review.
+                Review doctor weekday availability and clinic operating windows here.
               </p>
             </CardContent>
           </Card>
+
           <Card className="bg-emerald-50/80 dark:bg-emerald-950/30">
             <CardHeader>
-              <CardDescription>Appointments</CardDescription>
-              <CardTitle>0 scheduled today</CardTitle>
+              <CardDescription>Doctor Availability</CardDescription>
+              <CardTitle>Schedule summaries</CardTitle>
               <CardAction>
-                <div className="rounded-full bg-white/80 p-2 dark:bg-slate-900/80">
-                  <CalendarDays className="size-5 text-emerald-600" />
-                </div>
+                <Stethoscope className="size-5 text-emerald-600" />
               </CardAction>
             </CardHeader>
             <CardContent>
               <p className="text-sm text-muted-foreground">
-                Track queue volume and update slot availability.
+                Saved weekly schedules can be compared here as staffing coverage expands.
               </p>
             </CardContent>
           </Card>
+
           <Card className="bg-amber-50/80 dark:bg-amber-950/30">
             <CardHeader>
-              <CardDescription>Reports</CardDescription>
-              <CardTitle>0 pending reviews</CardTitle>
+              <CardDescription>Appointments</CardDescription>
+              <CardTitle>Scheduling readiness</CardTitle>
               <CardAction>
-                <div className="rounded-full bg-white/80 p-2 dark:bg-slate-900/80">
-                  <Activity className="size-5 text-amber-600" />
-                </div>
+                <CalendarDays className="size-5 text-amber-600" />
               </CardAction>
             </CardHeader>
             <CardContent>
               <p className="text-sm text-muted-foreground">
-                Operational summaries ready for admin review.
+                This page is ready for future admin scheduling and roster coordination tools.
               </p>
             </CardContent>
           </Card>

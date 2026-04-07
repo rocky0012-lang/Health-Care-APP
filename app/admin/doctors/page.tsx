@@ -15,6 +15,7 @@ import {
   SquarePen,
   Users,
 } from "lucide-react"
+import { Search } from "lucide-react"
 
 import { AdminHeader } from "@/components/admin-header"
 import { Button } from "@/components/ui/button"
@@ -58,6 +59,7 @@ import {
   updateDoctorAccountStatus,
   updateDoctorRecord,
 } from "@/lib/actions/doctor.action"
+import { adminHeaderNavItems } from "@/lib/admin-navigation"
 
 const doctorStatusOptions: DoctorAccountStatus[] = ["active", "deactivated", "suspended"]
 
@@ -83,6 +85,27 @@ function getDoctorStatusBadgeClass(status: DoctorAccountStatus) {
   }
 
   return "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
+}
+
+const weekdayScheduleItems: Array<{ key: DoctorScheduleDayKey; label: string }> = [
+  { key: "monday", label: "Mon" },
+  { key: "tuesday", label: "Tue" },
+  { key: "wednesday", label: "Wed" },
+  { key: "thursday", label: "Thu" },
+  { key: "friday", label: "Fri" },
+]
+
+function formatDoctorDaySchedule(
+  weeklySchedule: DoctorWeeklySchedule | undefined,
+  dayKey: DoctorScheduleDayKey
+) {
+  const day = weeklySchedule?.[dayKey]
+
+  if (!day?.enabled) {
+    return "Off"
+  }
+
+  return `${day.startTime}-${day.endTime}`
 }
 
 const navItems = [
@@ -143,6 +166,8 @@ type DoctorListItem = Awaited<ReturnType<typeof listDoctors>>[number]
 
 export default function AdminDoctorsPage() {
   const [recentDoctors, setRecentDoctors] = useState<DoctorListItem[]>([])
+  const [doctorSearchQuery, setDoctorSearchQuery] = useState("")
+  const [doctorStatusFilter, setDoctorStatusFilter] = useState<DoctorAccountStatus | "all">("all")
   const [saveMessage, setSaveMessage] = useState("")
   const [errorMessage, setErrorMessage] = useState("")
   const [editingDoctor, setEditingDoctor] = useState<DoctorListItem | null>(null)
@@ -181,7 +206,7 @@ export default function AdminDoctorsPage() {
   }, [])
 
   const refreshDoctors = async () => {
-    const doctors = await listDoctors(12)
+    const doctors = await listDoctors(500)
     setRecentDoctors(doctors)
     setRowStatusDrafts(
       doctors.reduce<Record<string, { status: DoctorAccountStatus; message: string }>>((accumulator, doctor) => {
@@ -194,6 +219,19 @@ export default function AdminDoctorsPage() {
       }, {})
     )
   }
+
+  const filteredDoctors = recentDoctors.filter((doctor) => {
+    const query = doctorSearchQuery.trim().toLowerCase()
+    const matchesQuery = !query || [doctor.name, doctor.fullName, doctor.email, doctor.phone, doctor.specialty, doctor.hospitalName]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase()
+      .includes(query)
+
+    const matchesStatus = doctorStatusFilter === "all" || (doctor.accountStatus || "active") === doctorStatusFilter
+
+    return matchesQuery && matchesStatus
+  })
 
   const updateRowNotificationDraft = (doctorId: string, message: string) => {
     setRowNotificationDrafts((current) => ({
@@ -451,6 +489,10 @@ export default function AdminDoctorsPage() {
         <AdminHeader
           pageTitle="Doctors"
           pageDescription="Create doctor Appwrite users and matching doctor records."
+          subNavItems={adminHeaderNavItems.map((item) => ({
+            ...item,
+            active: item.href === "/admin/doctors",
+          }))}
         />
 
         <section className="grid gap-4 p-4 md:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)] md:p-6">
@@ -657,16 +699,37 @@ export default function AdminDoctorsPage() {
 
             <Card>
               <CardHeader>
-                <CardDescription>Recently created records</CardDescription>
-                <CardTitle>Doctor directory snapshot</CardTitle>
+                <CardDescription>Doctor directory</CardDescription>
+                <CardTitle>Search and filter all created doctors</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                {recentDoctors.length === 0 ? (
+                <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_180px]">
+                  <div className="relative">
+                    <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      value={doctorSearchQuery}
+                      onChange={(event) => setDoctorSearchQuery(event.target.value)}
+                      placeholder="Search doctor by name, email, phone, specialty, or hospital"
+                      className="pl-9"
+                    />
+                  </div>
+                  <select
+                    value={doctorStatusFilter}
+                    onChange={(event) => setDoctorStatusFilter(event.target.value as DoctorAccountStatus | "all")}
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  >
+                    <option value="all">All statuses</option>
+                    <option value="active">Active</option>
+                    <option value="deactivated">Deactivated</option>
+                    <option value="suspended">Suspended</option>
+                  </select>
+                </div>
+                {filteredDoctors.length === 0 ? (
                   <div className="rounded-lg border border-dashed px-4 py-8 text-center text-sm text-muted-foreground">
-                    No doctor records found yet.
+                    No doctors matched the current filters.
                   </div>
                 ) : (
-                  recentDoctors.map((doctor) => (
+                  filteredDoctors.map((doctor) => (
                     <div key={doctor.$id} className="rounded-lg border px-4 py-3">
                       <div className="flex items-start justify-between gap-3">
                         <div>
@@ -691,6 +754,25 @@ export default function AdminDoctorsPage() {
                             <SquarePen className="mr-2 size-4" />
                             Edit
                           </Button>
+                        </div>
+                      </div>
+                      <div className="mt-4 rounded-lg border bg-white/80 p-3 dark:bg-slate-950/70">
+                        <div className="mb-2 flex items-center justify-between gap-3">
+                          <p className="text-sm font-medium text-foreground">Weekly schedule</p>
+                          <p className="text-xs text-muted-foreground">Mon-Fri availability</p>
+                        </div>
+                        <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
+                          {weekdayScheduleItems.map((day) => (
+                            <div
+                              key={day.key}
+                              className="rounded-md border bg-slate-50 px-3 py-2 text-xs dark:bg-slate-900/70"
+                            >
+                              <p className="font-medium text-foreground">{day.label}</p>
+                              <p className="mt-1 text-muted-foreground">
+                                {formatDoctorDaySchedule(doctor.weeklySchedule, day.key)}
+                              </p>
+                            </div>
+                          ))}
                         </div>
                       </div>
                       <div className="mt-4 grid gap-3 rounded-lg border bg-slate-50/80 p-3 dark:bg-slate-950/60">

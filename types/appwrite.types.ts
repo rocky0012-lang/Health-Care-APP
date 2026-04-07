@@ -26,6 +26,10 @@ export interface Patient extends Models.Document {
   identificationDocumentUrl?: string;
   identificationDocument: FormData | undefined;
   privacyConsent: boolean;
+  accountStatus?: PatientAccountStatus;
+  accountStatusMessage?: string;
+  accountStatusMessageUpdatedAt?: string;
+  adminNotifications?: PatientAdminNotification[];
 }
 
 export interface Doctor extends Models.Document {
@@ -47,6 +51,7 @@ export interface Doctor extends Models.Document {
   isActive: boolean;
   accountStatus: DoctorAccountStatus;
   accountStatusMessage?: string;
+  weeklySchedule?: DoctorWeeklySchedule;
 }
 
 export interface Appointment extends Models.Document {

@@ -6,6 +6,113 @@ import { InputFile } from "node-appwrite/file"
 import { parseStringify } from "../utils"
 
 const PUBLIC_AVATAR_PERMISSIONS = [Permission.read(Role.any())]
+const DEFAULT_PATIENT_ACCOUNT_STATUS: PatientAccountStatus = "active"
+const MAX_PATIENT_ADMIN_NOTIFICATIONS = 20
+
+type PatientStatusPrefs = {
+    accountStatus?: PatientAccountStatus
+    accountStatusMessage?: string
+    accountStatusMessageUpdatedAt?: string
+    adminNotifications?: PatientAdminNotification[]
+}
+
+function normalizePatientStatus(status?: string): PatientAccountStatus {
+    if (status === "deactivated" || status === "suspended") {
+        return status
+    }
+
+    return DEFAULT_PATIENT_ACCOUNT_STATUS
+}
+
+function normalizePatientStatusMessage(message?: string) {
+    const trimmedMessage = message?.trim()
+    return trimmedMessage ? trimmedMessage : undefined
+}
+
+function normalizePatientNotificationTone(tone?: string): DoctorNotificationTone {
+    if (tone === "warning" || tone === "success") {
+        return tone
+    }
+
+    return "default"
+}
+
+function normalizePatientNotifications(notifications: unknown): PatientAdminNotification[] {
+    if (!Array.isArray(notifications)) {
+        return []
+    }
+
+    const normalized: PatientAdminNotification[] = []
+
+    for (const notification of notifications) {
+        if (!notification || typeof notification !== "object") {
+            continue
+        }
+
+        const candidate = notification as Partial<PatientAdminNotification>
+        const title = typeof candidate.title === "string" ? candidate.title.trim() : ""
+        const message = typeof candidate.message === "string" ? candidate.message.trim() : ""
+        const createdAt = typeof candidate.createdAt === "string" ? candidate.createdAt : ""
+
+        if (!title || !message || !createdAt) {
+            continue
+        }
+
+        normalized.push({
+            id: typeof candidate.id === "string" && candidate.id.trim() ? candidate.id : ID.unique(),
+            title,
+            message,
+            tone: normalizePatientNotificationTone(candidate.tone),
+            createdAt,
+            kind:
+                candidate.kind === "status" ||
+                candidate.kind === "emergency-message" ||
+                candidate.kind === "broadcast"
+                    ? candidate.kind
+                    : "admin-message",
+            status:
+                candidate.status === "active" ||
+                candidate.status === "deactivated" ||
+                candidate.status === "suspended"
+                    ? candidate.status
+                    : undefined,
+        })
+    }
+
+    return normalized
+        .sort((left, right) => Date.parse(right.createdAt) - Date.parse(left.createdAt))
+        .slice(0, MAX_PATIENT_ADMIN_NOTIFICATIONS)
+}
+
+function buildPatientNotification({
+    title,
+    message,
+    tone,
+    kind,
+    status,
+}: {
+    title: string
+    message: string
+    tone: DoctorNotificationTone
+    kind: "status" | "admin-message" | "emergency-message" | "broadcast"
+    status?: PatientAccountStatus
+}): PatientAdminNotification {
+    return {
+        id: ID.unique(),
+        title: title.trim(),
+        message: message.trim(),
+        tone,
+        createdAt: new Date().toISOString(),
+        kind,
+        status,
+    }
+}
+
+function assertPatientStatusMessage(status: PatientAccountStatus, message?: string) {
+    if (normalizePatientStatus(status) !== "active" && !normalizePatientStatusMessage(message)) {
+        throw new Error("Please provide a reason for suspending or deactivating this patient.")
+    }
+}
 
 function buildBucketFileUrl(fileId?: string) {
     if (!fileId || !BUCKET_ID || !process.env.NEXT_PUBLIC_ENDPOINT || !process.env.PROJECT_ID) {
@@ -53,15 +160,115 @@ async function ensureAvatarFileIsReadable(fileId?: string) {
 function serializePatient<T extends Record<string, any>>(patient: T | null): (T & {
     avatarUrl: string
     identificationDocumentUrl: string
+    accountStatus: PatientAccountStatus
+    accountStatusMessage?: string
+    accountStatusMessageUpdatedAt?: string
+    adminNotifications: PatientAdminNotification[]
 }) | null {
     if (!patient) {
         return null
     }
 
+    const accountStatus = normalizePatientStatus(patient.accountStatus)
+
     return parseStringify({
         ...patient,
         avatarUrl: buildBucketFileUrl(patient.avatarId),
         identificationDocumentUrl: buildBucketFileUrl(patient.identificationDocumentId),
+        accountStatus,
+        accountStatusMessage: normalizePatientStatusMessage(patient.accountStatusMessage),
+        accountStatusMessageUpdatedAt:
+            typeof patient.accountStatusMessageUpdatedAt === "string"
+                ? patient.accountStatusMessageUpdatedAt
+                : undefined,
+        adminNotifications: normalizePatientNotifications(patient.adminNotifications),
+    })
+}
+
+async function getPatientStatusPrefs(userId: string): Promise<PatientStatusPrefs> {
+    if (!userId) {
+        return {}
+    }
+
+    try {
+        const prefs = await users.getPrefs<PatientStatusPrefs>({ userId })
+
+        return {
+            accountStatus: normalizePatientStatus(prefs?.accountStatus),
+            accountStatusMessage: normalizePatientStatusMessage(prefs?.accountStatusMessage),
+            accountStatusMessageUpdatedAt:
+                typeof prefs?.accountStatusMessageUpdatedAt === "string"
+                    ? prefs.accountStatusMessageUpdatedAt
+                    : undefined,
+            adminNotifications: normalizePatientNotifications(prefs?.adminNotifications),
+        }
+    } catch (error) {
+        console.error("getPatientStatusPrefs error:", error)
+        return {}
+    }
+}
+
+async function withPatientStatus<T extends Record<string, any>>(patient: T | null) {
+    if (!patient) {
+        return null
+    }
+
+    const statusPrefs = await getPatientStatusPrefs(patient.userId)
+    const accountStatus = normalizePatientStatus(statusPrefs.accountStatus)
+
+    return {
+        ...patient,
+        accountStatus,
+        accountStatusMessage: statusPrefs.accountStatusMessage,
+        accountStatusMessageUpdatedAt: statusPrefs.accountStatusMessageUpdatedAt,
+        adminNotifications: statusPrefs.adminNotifications || [],
+    }
+}
+
+async function updatePatientStatusPrefs(
+    userId: string,
+    status: PatientAccountStatus,
+    message?: string
+) {
+    if (!userId) {
+        return
+    }
+
+    assertPatientStatusMessage(status, message)
+
+    const existingPrefs = await users
+        .getPrefs<Record<string, any>>({ userId })
+        .catch(() => ({} as Record<string, any>))
+    const normalizedMessage = normalizePatientStatusMessage(message)
+    const normalizedNotifications = normalizePatientNotifications(existingPrefs.adminNotifications)
+
+    const nextNotifications = normalizedMessage
+        ? [
+            buildPatientNotification({
+                title:
+                    status === "suspended"
+                        ? "Account suspended"
+                        : status === "deactivated"
+                            ? "Account deactivated"
+                            : "Account active",
+                message: normalizedMessage,
+                tone: status === "active" ? "success" : "warning",
+                kind: "status",
+                status,
+            }),
+            ...normalizedNotifications,
+        ].slice(0, MAX_PATIENT_ADMIN_NOTIFICATIONS)
+        : normalizedNotifications
+
+    await users.updatePrefs({
+        userId,
+        prefs: {
+            ...existingPrefs,
+            accountStatus: normalizePatientStatus(status),
+            accountStatusMessage: normalizedMessage || "",
+            accountStatusMessageUpdatedAt: normalizedMessage ? new Date().toISOString() : "",
+            adminNotifications: nextNotifications,
+        },
     })
 }
 
@@ -217,7 +424,7 @@ export const getPatientByUserId = async (userId: string) => {
             await ensureAvatarFileIsReadable(patient.avatarId)
         }
 
-        return serializePatient(patient)
+        return serializePatient(await withPatientStatus(patient))
     } catch (error) {
         console.error("getPatientByUserId error:", error)
         throw error
@@ -308,11 +515,123 @@ export const updatePatientProfile = async (formData: FormData) => {
             },
         })
 
-        return serializePatient(updatedPatient)
+        return serializePatient(await withPatientStatus(updatedPatient))
     } catch (error) {
         console.error("updatePatientProfile error:", error)
         throw error
     }
+}
+
+export const listPatients = async (limit = 200) => {
+    try {
+        if (!DATABASE_ID || !PATIENT_TABLE_ID) {
+            throw new Error("Missing DATABASE_ID or PATIENT_TABLE_ID in environment")
+        }
+
+        const response = await tablesDB.listRows({
+            databaseId: DATABASE_ID,
+            tableId: PATIENT_TABLE_ID,
+            queries: [Query.orderDesc("$createdAt"), Query.limit(limit)],
+        })
+
+        const patientsWithStatus = await Promise.all(response.rows.map((patient) => withPatientStatus(patient)))
+
+        return patientsWithStatus
+            .map((patient) => serializePatient(patient))
+            .filter((patient): patient is NonNullable<typeof patient> => Boolean(patient))
+    } catch (error) {
+        console.error("listPatients error:", error)
+        throw error
+    }
+}
+
+export const updatePatientAccountStatus = async ({
+    userId,
+    accountStatus,
+    accountStatusMessage,
+}: {
+    userId: string
+    accountStatus: PatientAccountStatus
+    accountStatusMessage?: string
+}) => {
+    const normalizedStatus = normalizePatientStatus(accountStatus)
+    const normalizedMessage = normalizePatientStatusMessage(accountStatusMessage)
+
+    await updatePatientStatusPrefs(userId, normalizedStatus, normalizedMessage)
+
+    return getPatientByUserId(userId)
+}
+
+export const sendPatientNotification = async ({
+    userId,
+    title,
+    message,
+    emergency = false,
+}: {
+    userId: string
+    title?: string
+    message: string
+    emergency?: boolean
+}) => {
+    const normalizedMessage = normalizePatientStatusMessage(message)
+    const normalizedTitle = title?.trim() || (emergency ? "Emergency message" : "Admin message")
+
+    if (!userId) {
+        throw new Error("Missing patient userId for notification delivery.")
+    }
+
+    if (!normalizedMessage) {
+        throw new Error("Enter a notification message before sending it to the patient.")
+    }
+
+    const existingPrefs = await users
+        .getPrefs<Record<string, any>>({ userId })
+        .catch(() => ({} as Record<string, any>))
+    const normalizedNotifications = normalizePatientNotifications(existingPrefs.adminNotifications)
+
+    const nextNotification = buildPatientNotification({
+        title: normalizedTitle,
+        message: normalizedMessage,
+        tone: emergency ? "warning" : "default",
+        kind: emergency ? "emergency-message" : "admin-message",
+    })
+
+    await users.updatePrefs({
+        userId,
+        prefs: {
+            ...existingPrefs,
+            adminNotifications: [nextNotification, ...normalizedNotifications].slice(0, MAX_PATIENT_ADMIN_NOTIFICATIONS),
+        },
+    })
+
+    return parseStringify(nextNotification)
+}
+
+export const sendBroadcastPatientNotification = async ({
+    title,
+    message,
+    emergency = false,
+}: {
+    title?: string
+    message: string
+    emergency?: boolean
+}) => {
+    const patients = await listPatients(500)
+
+    const uniqueUserIds = Array.from(new Set(patients.map((patient) => patient.userId).filter(Boolean)))
+
+    await Promise.all(
+        uniqueUserIds.map((userId) =>
+            sendPatientNotification({
+                userId,
+                title: title?.trim() || (emergency ? "Emergency broadcast" : "Admin broadcast"),
+                message,
+                emergency,
+            })
+        )
+    )
+
+    return { delivered: uniqueUserIds.length }
 }
 
 {/*export const getUser = async (userId: string) => {

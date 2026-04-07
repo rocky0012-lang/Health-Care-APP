@@ -25,6 +25,7 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar"
 import { AdminHeader } from "@/components/admin-header"
+import { adminHeaderNavItems } from "@/lib/admin-navigation"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -110,6 +111,10 @@ export default function ReportsPage() {
         <AdminHeader
           pageTitle="Reports"
           pageDescription="View operational reports and analytics."
+          subNavItems={adminHeaderNavItems.map((item) => ({
+            ...item,
+            active: item.href === "/admin/reports",
+          }))}
         />
 
         <section className="grid gap-4 p-4 md:grid-cols-2 md:p-6">

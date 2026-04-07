@@ -9,7 +9,17 @@ declare type Gender = "Male" | "Female" | "Other";
 declare type Status = "pending" | "scheduled" | "cancelled";
 declare type UserRole = "admin" | "patient" | "doctor";
 declare type DoctorAccountStatus = "active" | "deactivated" | "suspended";
+declare type PatientAccountStatus = "active" | "deactivated" | "suspended";
 declare type DoctorNotificationTone = "default" | "warning" | "success";
+declare type DoctorScheduleDayKey = "monday" | "tuesday" | "wednesday" | "thursday" | "friday";
+
+declare interface DoctorWeeklyScheduleDay {
+  enabled: boolean;
+  startTime: string;
+  endTime: string;
+}
+
+declare type DoctorWeeklySchedule = Record<DoctorScheduleDayKey, DoctorWeeklyScheduleDay>;
 
 declare interface DoctorAdminNotification {
   id: string;
@@ -19,6 +29,16 @@ declare interface DoctorAdminNotification {
   createdAt: string;
   kind: "status" | "admin-message";
   status?: DoctorAccountStatus;
+}
+
+declare interface PatientAdminNotification {
+  id: string;
+  title: string;
+  message: string;
+  tone: DoctorNotificationTone;
+  createdAt: string;
+  kind: "status" | "admin-message" | "emergency-message" | "broadcast";
+  status?: PatientAccountStatus;
 }
 
 declare interface CreateUserParams {
@@ -51,6 +71,7 @@ declare interface CreateDoctorRecordParams {
   profilePhoto?: string;
   accountStatus: DoctorAccountStatus;
   accountStatusMessage?: string;
+  weeklySchedule?: DoctorWeeklySchedule;
 }
 
 declare interface UpdateDoctorRecordParams extends CreateDoctorRecordParams {

@@ -9,10 +9,68 @@ type DoctorStatusPrefs = {
   accountStatusMessage?: string
   accountStatusMessageUpdatedAt?: string
   adminNotifications?: DoctorAdminNotification[]
+  weeklySchedule?: DoctorWeeklySchedule
 }
 
 const DEFAULT_DOCTOR_ACCOUNT_STATUS: DoctorAccountStatus = "active"
 const MAX_DOCTOR_ADMIN_NOTIFICATIONS = 20
+const DEFAULT_WEEKLY_SCHEDULE: DoctorWeeklySchedule = {
+  monday: { enabled: false, startTime: "09:00", endTime: "17:00" },
+  tuesday: { enabled: false, startTime: "09:00", endTime: "17:00" },
+  wednesday: { enabled: false, startTime: "09:00", endTime: "17:00" },
+  thursday: { enabled: false, startTime: "09:00", endTime: "17:00" },
+  friday: { enabled: false, startTime: "09:00", endTime: "17:00" },
+}
+const DOCTOR_SCHEDULE_DAY_KEYS: DoctorScheduleDayKey[] = [
+  "monday",
+  "tuesday",
+  "wednesday",
+  "thursday",
+  "friday",
+]
+
+function isTimeValue(value: unknown): value is string {
+  return typeof value === "string" && /^([01]\d|2[0-3]):[0-5]\d$/.test(value)
+}
+
+function normalizeDoctorWeeklySchedule(schedule: unknown): DoctorWeeklySchedule {
+  if (!schedule || typeof schedule !== "object") {
+    return DEFAULT_WEEKLY_SCHEDULE
+  }
+
+  const candidate = schedule as Partial<Record<DoctorScheduleDayKey, Partial<DoctorWeeklyScheduleDay>>>
+
+  return DOCTOR_SCHEDULE_DAY_KEYS.reduce<DoctorWeeklySchedule>((accumulator, dayKey) => {
+    const defaultDay = DEFAULT_WEEKLY_SCHEDULE[dayKey]
+    const nextDay = candidate[dayKey]
+
+    accumulator[dayKey] = {
+      enabled: typeof nextDay?.enabled === "boolean" ? nextDay.enabled : defaultDay.enabled,
+      startTime: isTimeValue(nextDay?.startTime) ? nextDay.startTime : defaultDay.startTime,
+      endTime: isTimeValue(nextDay?.endTime) ? nextDay.endTime : defaultDay.endTime,
+    }
+
+    return accumulator
+  }, {} as DoctorWeeklySchedule)
+}
+
+function assertDoctorWeeklySchedule(schedule: DoctorWeeklySchedule) {
+  for (const dayKey of DOCTOR_SCHEDULE_DAY_KEYS) {
+    const day = schedule[dayKey]
+
+    if (!day.enabled) {
+      continue
+    }
+
+    if (!isTimeValue(day.startTime) || !isTimeValue(day.endTime)) {
+      throw new Error("Each enabled weekday needs a valid start and end time.")
+    }
+
+    if (day.startTime >= day.endTime) {
+      throw new Error("Each enabled weekday must end after it starts.")
+    }
+  }
+}
 
 function normalizeDoctorStatus(status?: string): DoctorAccountStatus {
   if (status === "deactivated" || status === "suspended") {
@@ -123,6 +181,7 @@ async function getDoctorStatusPrefs(userId: string): Promise<DoctorStatusPrefs> 
           ? prefs.accountStatusMessageUpdatedAt
           : undefined,
       adminNotifications: normalizeDoctorNotifications(prefs?.adminNotifications),
+      weeklySchedule: normalizeDoctorWeeklySchedule(prefs?.weeklySchedule),
     }
   } catch (error) {
     console.error("getDoctorStatusPrefs error:", error)
@@ -193,6 +252,7 @@ async function withDoctorStatus<T extends Record<string, any>>(doctor: T | null)
     accountStatusMessage: statusPrefs.accountStatusMessage,
     accountStatusMessageUpdatedAt: statusPrefs.accountStatusMessageUpdatedAt,
     adminNotifications: statusPrefs.adminNotifications || [],
+    weeklySchedule: normalizeDoctorWeeklySchedule(statusPrefs.weeklySchedule),
     isActive: accountStatus === "active",
   }
 }
@@ -206,6 +266,7 @@ function serializeDoctor<T extends Record<string, any>>(doctor: T | null): (T & 
   accountStatusMessage?: string
   accountStatusMessageUpdatedAt?: string
   adminNotifications: DoctorAdminNotification[]
+  weeklySchedule: DoctorWeeklySchedule
   isActive: boolean
 }) | null {
   if (!doctor) {
@@ -227,6 +288,7 @@ function serializeDoctor<T extends Record<string, any>>(doctor: T | null): (T & 
         ? doctor.accountStatusMessageUpdatedAt
         : undefined,
     adminNotifications: normalizeDoctorNotifications(doctor.adminNotifications),
+    weeklySchedule: normalizeDoctorWeeklySchedule(doctor.weeklySchedule),
     isActive: accountStatus === "active",
   })
 }
@@ -505,6 +567,35 @@ export const sendDoctorNotification = async ({
   })
 
   return parseStringify(nextPrefs.adminNotifications[0])
+}
+
+export const updateDoctorWeeklySchedule = async ({
+  userId,
+  weeklySchedule,
+}: {
+  userId: string
+  weeklySchedule: DoctorWeeklySchedule
+}) => {
+  if (!userId) {
+    throw new Error("Missing doctor userId for schedule update.")
+  }
+
+  const normalizedSchedule = normalizeDoctorWeeklySchedule(weeklySchedule)
+  assertDoctorWeeklySchedule(normalizedSchedule)
+
+  const existingPrefs = await users
+    .getPrefs<Record<string, any>>({ userId })
+    .catch(() => ({} as Record<string, any>))
+
+  await users.updatePrefs({
+    userId,
+    prefs: {
+      ...existingPrefs,
+      weeklySchedule: normalizedSchedule,
+    },
+  })
+
+  return getDoctorByUserId(userId)
 }
 
 export const updateDoctorAccountStatus = async ({

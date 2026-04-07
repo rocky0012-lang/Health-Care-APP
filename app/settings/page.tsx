@@ -1,8 +1,8 @@
 "use client"
 
-import Link from "next/link"
-import { ArrowLeft, Bell, Globe, Lock, Palette } from "lucide-react"
-import { Button } from "@/components/ui/button"
+import { Bell, Globe, Lock, Palette } from "lucide-react"
+
+import { PatientShell } from "@/components/patient-shell"
 import {
   Card,
   CardAction,
@@ -14,23 +14,12 @@ import {
 
 export default function SettingsPage() {
   return (
+    <PatientShell
+      pageTitle="Settings"
+      pageDescription="Manage notification preferences, language, privacy, and appearance."
+    >
     <main className="min-h-screen bg-slate-50 px-4 py-8 text-slate-950 dark:bg-slate-950 dark:text-slate-50 md:px-8">
       <div className="mx-auto flex max-w-5xl flex-col gap-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-semibold tracking-tight md:text-4xl">Settings</h1>
-            <p className="text-sm text-muted-foreground">
-              Manage notifications, language, privacy, and appearance.
-            </p>
-          </div>
-          <Button asChild variant="outline">
-            <Link href="/patientsDashboard">
-              <ArrowLeft className="mr-2 size-4" />
-              Back
-            </Link>
-          </Button>
-        </div>
-
         <section className="grid gap-4 md:grid-cols-2">
           <Card className="bg-blue-50/80 dark:bg-blue-950/30">
             <CardHeader>
@@ -94,5 +83,6 @@ export default function SettingsPage() {
         </section>
       </div>
     </main>
+    </PatientShell>
   )
 }

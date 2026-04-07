@@ -1,17 +1,13 @@
 "use client"
 
-import Link from "next/link"
 import { ChangeEvent, useEffect, useMemo, useState } from "react"
 import {
-  ArrowLeft,
   IdCard,
-  Mail,
-  Phone,
   Save,
   Upload,
-  UserRound,
 } from "lucide-react"
 
+import { PatientShell } from "@/components/patient-shell"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -320,6 +316,10 @@ export default function ProfilePage() {
 
   if (isLoading) {
     return (
+      <PatientShell
+        pageTitle="Profile"
+        pageDescription="Review and update the information you entered during registration."
+      >
       <main className="h-screen overflow-y-auto bg-slate-50 px-4 py-8 text-slate-950 dark:bg-slate-950 dark:text-slate-50 md:px-8">
         <div className="mx-auto flex max-w-6xl flex-col gap-6">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -327,7 +327,6 @@ export default function ProfilePage() {
               <Skeleton className="h-10 w-40" />
               <Skeleton className="h-4 w-72 max-w-full" />
             </div>
-            <Skeleton className="h-10 w-full sm:w-28" />
           </div>
 
           <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700 dark:border-blue-900 dark:bg-blue-950/30 dark:text-blue-200">
@@ -384,27 +383,17 @@ export default function ProfilePage() {
           </div>
         </div>
       </main>
+      </PatientShell>
     )
   }
 
   return (
+    <PatientShell
+      pageTitle="Profile"
+      pageDescription="Review and update the information you entered during registration."
+    >
     <main className="h-screen overflow-y-auto bg-slate-50 px-4 py-8 text-slate-950 dark:bg-slate-950 dark:text-slate-50 md:px-8">
       <div className="mx-auto flex max-w-6xl flex-col gap-6">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <h1 className="text-3xl font-semibold tracking-tight md:text-4xl">Profile</h1>
-            <p className="text-sm text-muted-foreground">
-              Update the information you entered during registration.
-            </p>
-          </div>
-          <Button asChild variant="outline" className="w-full sm:w-auto">
-            <Link href="/patientsDashboard">
-              <ArrowLeft className="mr-2 size-4" />
-              Back
-            </Link>
-          </Button>
-        </div>
-
         {(errorMessage || saveMessage) && (
           <div
             className={`rounded-lg border px-4 py-3 text-sm ${
@@ -620,5 +609,6 @@ export default function ProfilePage() {
         </div>
       </div>
     </main>
+    </PatientShell>
   )
 }
