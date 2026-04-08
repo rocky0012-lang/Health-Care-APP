@@ -53,6 +53,7 @@ function normalizePatientNotifications(notifications: unknown): PatientAdminNoti
         const title = typeof candidate.title === "string" ? candidate.title.trim() : ""
         const message = typeof candidate.message === "string" ? candidate.message.trim() : ""
         const createdAt = typeof candidate.createdAt === "string" ? candidate.createdAt : ""
+        const readAt = typeof candidate.readAt === "string" && candidate.readAt.trim() ? candidate.readAt : undefined
 
         if (!title || !message || !createdAt) {
             continue
@@ -64,10 +65,13 @@ function normalizePatientNotifications(notifications: unknown): PatientAdminNoti
             message,
             tone: normalizePatientNotificationTone(candidate.tone),
             createdAt,
+            readAt,
             kind:
                 candidate.kind === "status" ||
                 candidate.kind === "emergency-message" ||
-                candidate.kind === "broadcast"
+                candidate.kind === "broadcast" ||
+                candidate.kind === "doctor-message" ||
+                candidate.kind === "appointment-update"
                     ? candidate.kind
                     : "admin-message",
             status:
@@ -94,7 +98,7 @@ function buildPatientNotification({
     title: string
     message: string
     tone: DoctorNotificationTone
-    kind: "status" | "admin-message" | "emergency-message" | "broadcast"
+    kind: PatientNotificationKind
     status?: PatientAccountStatus
 }): PatientAdminNotification {
     return {
@@ -103,9 +107,39 @@ function buildPatientNotification({
         message: message.trim(),
         tone,
         createdAt: new Date().toISOString(),
+        readAt: undefined,
         kind,
         status,
     }
+}
+
+async function getPatientPrefsRecord(userId: string) {
+    return users
+        .getPrefs<Record<string, any>>({ userId })
+        .catch(() => ({} as Record<string, any>))
+}
+
+async function updatePatientNotifications(
+    userId: string,
+    updater: (notifications: PatientAdminNotification[]) => PatientAdminNotification[]
+) {
+    if (!userId) {
+        throw new Error("Missing patient userId for notification update.")
+    }
+
+    const existingPrefs = await getPatientPrefsRecord(userId)
+    const normalizedNotifications = normalizePatientNotifications(existingPrefs.adminNotifications)
+    const nextNotifications = updater(normalizedNotifications)
+
+    await users.updatePrefs({
+        userId,
+        prefs: {
+            ...existingPrefs,
+            adminNotifications: nextNotifications,
+        },
+    })
+
+    return parseStringify(nextNotifications)
 }
 
 function assertPatientStatusMessage(status: PatientAccountStatus, message?: string) {
@@ -236,9 +270,7 @@ async function updatePatientStatusPrefs(
 
     assertPatientStatusMessage(status, message)
 
-    const existingPrefs = await users
-        .getPrefs<Record<string, any>>({ userId })
-        .catch(() => ({} as Record<string, any>))
+    const existingPrefs = await getPatientPrefsRecord(userId)
     const normalizedMessage = normalizePatientStatusMessage(message)
     const normalizedNotifications = normalizePatientNotifications(existingPrefs.adminNotifications)
 
@@ -431,6 +463,37 @@ export const getPatientByUserId = async (userId: string) => {
     }
 }
 
+export const getPatientById = async (patientId: string) => {
+    try {
+        if (!DATABASE_ID || !PATIENT_TABLE_ID) {
+            throw new Error("Missing DATABASE_ID or PATIENT_TABLE_ID in environment")
+        }
+
+        if (!patientId) {
+            return null
+        }
+
+        const patient = await tablesDB.getRow({
+            databaseId: DATABASE_ID,
+            tableId: PATIENT_TABLE_ID,
+            rowId: patientId,
+        })
+
+        if (!patient) {
+            return null
+        }
+
+        if (patient.avatarId) {
+            await ensureAvatarFileIsReadable(patient.avatarId)
+        }
+
+        return serializePatient(await withPatientStatus(patient))
+    } catch (error) {
+        console.error("getPatientById error:", error)
+        throw error
+    }
+}
+
 export const updatePatientProfile = async (formData: FormData) => {
     try {
         const userId = String(formData.get("userId") || "")
@@ -567,11 +630,15 @@ export const sendPatientNotification = async ({
     title,
     message,
     emergency = false,
+    tone,
+    kind,
 }: {
     userId: string
     title?: string
     message: string
     emergency?: boolean
+    tone?: DoctorNotificationTone
+    kind?: PatientNotificationKind
 }) => {
     const normalizedMessage = normalizePatientStatusMessage(message)
     const normalizedTitle = title?.trim() || (emergency ? "Emergency message" : "Admin message")
@@ -584,16 +651,14 @@ export const sendPatientNotification = async ({
         throw new Error("Enter a notification message before sending it to the patient.")
     }
 
-    const existingPrefs = await users
-        .getPrefs<Record<string, any>>({ userId })
-        .catch(() => ({} as Record<string, any>))
+    const existingPrefs = await getPatientPrefsRecord(userId)
     const normalizedNotifications = normalizePatientNotifications(existingPrefs.adminNotifications)
 
     const nextNotification = buildPatientNotification({
         title: normalizedTitle,
         message: normalizedMessage,
-        tone: emergency ? "warning" : "default",
-        kind: emergency ? "emergency-message" : "admin-message",
+        tone: emergency ? "warning" : normalizePatientNotificationTone(tone),
+        kind: kind || (emergency ? "emergency-message" : "admin-message"),
     })
 
     await users.updatePrefs({
@@ -605,6 +670,44 @@ export const sendPatientNotification = async ({
     })
 
     return parseStringify(nextNotification)
+}
+
+export const markPatientNotificationReadState = async ({
+    userId,
+    notificationId,
+    read,
+}: {
+    userId: string
+    notificationId: string
+    read: boolean
+}) => {
+    if (!notificationId) {
+        throw new Error("Missing notification id.")
+    }
+
+    const nextReadAt = read ? new Date().toISOString() : undefined
+
+    return updatePatientNotifications(userId, (notifications) =>
+        notifications.map((notification) =>
+            notification.id === notificationId
+                ? {
+                    ...notification,
+                    readAt: nextReadAt,
+                }
+                : notification
+        )
+    )
+}
+
+export const markAllPatientNotificationsAsRead = async (userId: string) => {
+    const markedAt = new Date().toISOString()
+
+    return updatePatientNotifications(userId, (notifications) =>
+        notifications.map((notification) => ({
+            ...notification,
+            readAt: notification.readAt || markedAt,
+        }))
+    )
 }
 
 export const sendBroadcastPatientNotification = async ({

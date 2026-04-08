@@ -6,11 +6,13 @@ declare type SearchParamProps = {
 };
 
 declare type Gender = "Male" | "Female" | "Other";
-declare type Status = "pending" | "scheduled" | "cancelled";
+declare type Status = "scheduled" | "confirmed" | "completed" | "cancelled" | "no-show";
+declare type AppointmentBookingChannel = "web" | "mobile" | "phone";
 declare type UserRole = "admin" | "patient" | "doctor";
 declare type DoctorAccountStatus = "active" | "deactivated" | "suspended";
 declare type PatientAccountStatus = "active" | "deactivated" | "suspended";
 declare type DoctorNotificationTone = "default" | "warning" | "success";
+declare type PatientNotificationKind = "status" | "admin-message" | "emergency-message" | "broadcast" | "doctor-message" | "appointment-update";
 declare type DoctorScheduleDayKey = "monday" | "tuesday" | "wednesday" | "thursday" | "friday";
 
 declare interface DoctorWeeklyScheduleDay {
@@ -37,7 +39,8 @@ declare interface PatientAdminNotification {
   message: string;
   tone: DoctorNotificationTone;
   createdAt: string;
-  kind: "status" | "admin-message" | "emergency-message" | "broadcast";
+  readAt?: string;
+  kind: PatientNotificationKind;
   status?: PatientAccountStatus;
 }
 
@@ -106,13 +109,14 @@ declare interface RegisterUserParams extends CreateUserParams {
 }
 
 declare type CreateAppointmentParams = {
-  userId: string;
-  patient: string;
-  primaryPhysician: string;
-  reason: string;
-  schedule: Date;
+  patientUserId: string;
+  doctorId: string;
+  appointmentDate: string;
+  timeSlot: string;
   status: Status;
-  note: string | undefined;
+  reasonForVisit: string;
+  notes?: string;
+  bookingChannel: AppointmentBookingChannel;
 };
 
 declare type UpdateAppointmentParams = {

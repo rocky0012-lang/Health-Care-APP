@@ -55,12 +55,30 @@ export interface Doctor extends Models.Document {
 }
 
 export interface Appointment extends Models.Document {
-  patient: Patient;
-  schedule: Date;
+  appointment_date: string;
+  time_slot: string;
   status: Status;
-  primaryPhysician: string;
-  reason: string;
-  note: string;
-  userId: string;
-  cancellationReason: string | null;
+  reason_for_visit: string;
+  notes?: string;
+  booking_channel: AppointmentBookingChannel;
+  patient: Patient | string;
+  doctor: Doctor | string;
+  schedule?: Date;
+  reason?: string;
+  note?: string;
+  primaryPhysician?: string;
+  userId?: string;
+  cancellationReason?: string | null;
+  doctorDetails?: {
+    id: string;
+    fullName: string;
+    avatarUrl?: string;
+    specialty?: string;
+  } | null;
+  patientDetails?: {
+    id: string;
+    fullName: string;
+    avatarUrl?: string;
+    phone?: string;
+  } | null;
 }

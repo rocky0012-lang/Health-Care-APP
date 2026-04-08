@@ -24,6 +24,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Textarea } from "@/components/ui/textarea"
 import { PhoneNumberInput } from "@/components/ui/phone-number-input"
+import { listDoctors } from "@/lib/actions/doctor.action"
 import { getPatientByUserId, updatePatientProfile } from "@/lib/actions/patient.action"
 import { isE164PhoneNumber } from "@/lib/phone"
 import {
@@ -54,6 +55,8 @@ type ProfileFormState = {
   identificationNumber: string
   privacyConsent: boolean
 }
+
+type ProfileDoctorOption = Awaited<ReturnType<typeof listDoctors>>[number]
 
 const emptyForm: ProfileFormState = {
   firstName: "",
@@ -102,9 +105,38 @@ function toDisplayName(form: ProfileFormState) {
   return `${form.firstName} ${form.lastName}`.trim()
 }
 
+function normalizeDoctorMatchValue(value?: string) {
+  return value?.trim().toLowerCase() || ""
+}
+
+function getDoctorDisplayName(doctor: ProfileDoctorOption) {
+  return doctor.name || doctor.fullName || ""
+}
+
+function getDoctorSpecialtyLabel(doctor: ProfileDoctorOption) {
+  return doctor.specialization || doctor.specialty || "General care"
+}
+
+function findDoctorForPrimaryPhysician(doctors: ProfileDoctorOption[], primaryPhysician?: string) {
+  const normalizedPrimaryPhysician = normalizeDoctorMatchValue(primaryPhysician)
+
+  if (!normalizedPrimaryPhysician) {
+    return null
+  }
+
+  return (
+    doctors.find((doctor) => {
+      const candidates = [doctor.$id, doctor.name, doctor.fullName]
+      return candidates.some((candidate) => normalizeDoctorMatchValue(candidate) === normalizedPrimaryPhysician)
+    }) || null
+  )
+}
+
 export default function ProfilePage() {
   const [userId, setUserId] = useState("")
   const [form, setForm] = useState<ProfileFormState>(emptyForm)
+  const [availableDoctors, setAvailableDoctors] = useState<ProfileDoctorOption[]>([])
+  const [doctorTypeFilter, setDoctorTypeFilter] = useState("all")
   const [avatarPreview, setAvatarPreview] = useState("")
   const [avatarFile, setAvatarFile] = useState<File | null>(null)
   const [identificationFile, setIdentificationFile] = useState<File | null>(null)
@@ -134,13 +166,26 @@ export default function ProfilePage() {
       }
 
       try {
-        const patient = await getPatientByUserId(storedUserId)
+        const [patient, doctors] = await Promise.all([
+          getPatientByUserId(storedUserId),
+          listDoctors(500),
+        ])
 
         if (!patient) {
           setErrorMessage("No patient profile was found for this account.")
           setIsLoading(false)
           return
         }
+
+        const activeDoctors = doctors.filter((doctor) => (doctor.accountStatus || "active") === "active")
+        const matchedPrimaryDoctor = findDoctorForPrimaryPhysician(activeDoctors, patient.primaryPhysician || "")
+
+        setAvailableDoctors(activeDoctors)
+        setDoctorTypeFilter(
+          matchedPrimaryDoctor
+            ? normalizeDoctorMatchValue(getDoctorSpecialtyLabel(matchedPrimaryDoctor)) || "all"
+            : "all"
+        )
 
         const name = splitName(patient.name || "")
 
@@ -191,6 +236,39 @@ export default function ProfilePage() {
   }, [])
 
   const fullName = useMemo(() => toDisplayName(form) || "Patient", [form])
+
+  const doctorTypeOptions = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          availableDoctors
+            .map((doctor) => getDoctorSpecialtyLabel(doctor).trim())
+            .filter(Boolean)
+        )
+      ).sort((left, right) => left.localeCompare(right)),
+    [availableDoctors]
+  )
+
+  const filteredDoctors = useMemo(() => {
+    if (doctorTypeFilter === "all") {
+      return availableDoctors
+    }
+
+    return availableDoctors.filter(
+      (doctor) => normalizeDoctorMatchValue(getDoctorSpecialtyLabel(doctor)) === doctorTypeFilter
+    )
+  }, [availableDoctors, doctorTypeFilter])
+
+  const savedPrimaryDoctorVisible = useMemo(
+    () =>
+      Boolean(
+        form.primaryPhysician &&
+          !filteredDoctors.some(
+            (doctor) => normalizeDoctorMatchValue(getDoctorDisplayName(doctor)) === normalizeDoctorMatchValue(form.primaryPhysician)
+          )
+      ),
+    [filteredDoctors, form.primaryPhysician]
+  )
 
   const handleInputChange = (
     event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
@@ -521,8 +599,50 @@ export default function ProfilePage() {
                   <Input id="emergencyContactNumber" name="emergencyContactNumber" value={form.emergencyContactNumber} onChange={handleInputChange} />
                 </div>
                 <div className="grid gap-2">
+                  <label htmlFor="doctorType" className="text-[0.8rem] font-semibold tracking-[0.02em] text-slate-700 dark:text-slate-200">Doctor Type</label>
+                  <select
+                    id="doctorType"
+                    value={doctorTypeFilter}
+                    onChange={(event) => setDoctorTypeFilter(event.target.value)}
+                    className="flex h-10 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
+                  >
+                    <option value="all">Any type</option>
+                    {doctorTypeOptions.map((doctorType) => (
+                      <option key={doctorType} value={normalizeDoctorMatchValue(doctorType)}>
+                        {doctorType}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="grid gap-2 md:col-span-2">
                   <label htmlFor="primaryPhysician" className="text-[0.8rem] font-semibold tracking-[0.02em] text-slate-700 dark:text-slate-200">Primary Physician</label>
-                  <Input id="primaryPhysician" name="primaryPhysician" value={form.primaryPhysician} onChange={handleInputChange} />
+                  <select
+                    id="primaryPhysician"
+                    name="primaryPhysician"
+                    value={form.primaryPhysician}
+                    onChange={(event) =>
+                      setForm((current) => ({ ...current, primaryPhysician: event.target.value }))
+                    }
+                    disabled={availableDoctors.length === 0}
+                    className="flex h-10 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
+                  >
+                    {!form.primaryPhysician ? <option value="">Select a physician</option> : null}
+                    {savedPrimaryDoctorVisible ? (
+                      <option value={form.primaryPhysician}>{form.primaryPhysician} (saved)</option>
+                    ) : null}
+                    {filteredDoctors.map((doctor) => {
+                      const doctorName = getDoctorDisplayName(doctor)
+                      return (
+                        <option key={doctor.$id} value={doctorName}>
+                          {doctorName} - {getDoctorSpecialtyLabel(doctor)}
+                        </option>
+                      )
+                    })}
+                    {availableDoctors.length === 0 ? <option value="">No active doctors available</option> : null}
+                  </select>
+                  <p className="text-xs text-muted-foreground">
+                    Filter doctors by specialty, then choose your registered primary physician.
+                  </p>
                 </div>
               </CardContent>
             </Card>

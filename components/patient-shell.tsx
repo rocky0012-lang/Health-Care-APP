@@ -5,13 +5,12 @@ import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import {
   AlertTriangle,
+  Bell,
   CalendarCheck,
   CreditCard,
   FileText,
   LayoutDashboard,
   LogOut,
-  Settings,
-  UserRound,
 } from "lucide-react"
 
 import { AdminHeader } from "@/components/admin-header"
@@ -46,10 +45,9 @@ type PatientShellProps = {
 const navItems = [
   { label: "Overview", href: "/patientsDashboard", icon: LayoutDashboard },
   { label: "Appointments", href: "/patientsDashboard/appointments", icon: CalendarCheck },
+  { label: "Messages", href: "/patientsDashboard/messages", icon: Bell },
   { label: "Records", href: "/patientsDashboard/records", icon: FileText },
   { label: "Billing", href: "/patientsDashboard/billing", icon: CreditCard },
-  { label: "Profile", href: "/profile", icon: UserRound },
-  { label: "Settings", href: "/settings", icon: Settings },
 ]
 
 function isActiveStatusNoticeVisible(notification: PatientAdminNotification) {
@@ -106,6 +104,7 @@ export function PatientShell({ pageTitle, pageDescription, children }: PatientSh
 
         const visibleNotifications = (patient.adminNotifications || [])
           .filter((notification) => isActiveStatusNoticeVisible(notification))
+          .filter((notification) => !notification.readAt)
           .map((notification) => ({
             id: notification.id,
             title: notification.title,

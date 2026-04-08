@@ -10,8 +10,7 @@ import {
   PATIENT_SESSION_COOKIE,
   createSignedAuthToken,
 } from "@/lib/auth-cookies"
-
-const ADMIN_PASSKEY = process.env.ADMIN_PASSKEY || "567468"
+import { updateStoredAdminPasskey, verifyAdminPasskey } from "@/lib/admin-passkey-store"
 
 function getCookieOptions(maxAge = DEFAULT_COOKIE_MAX_AGE) {
   return {
@@ -24,7 +23,7 @@ function getCookieOptions(maxAge = DEFAULT_COOKIE_MAX_AGE) {
 }
 
 export async function createAdminSession(passkey: string) {
-  if (passkey !== ADMIN_PASSKEY) {
+  if (!(await verifyAdminPasskey(passkey))) {
     return { ok: false as const, error: "Invalid passkey. Please try again." }
   }
 
@@ -42,6 +41,36 @@ export async function createAdminSession(passkey: string) {
 export async function clearAdminSession() {
   const cookieStore = await cookies()
   cookieStore.delete(ADMIN_ACCESS_COOKIE)
+}
+
+export async function resetAdminPassword({
+  currentPassword,
+  nextPassword,
+  confirmPassword,
+}: {
+  currentPassword: string
+  nextPassword: string
+  confirmPassword: string
+}) {
+  const normalizedCurrent = currentPassword.trim()
+  const normalizedNext = nextPassword.trim()
+  const normalizedConfirm = confirmPassword.trim()
+
+  if (!normalizedCurrent || !normalizedNext || !normalizedConfirm) {
+    throw new Error("Current passkey, new passkey, and confirmation are all required.")
+  }
+
+  if (normalizedNext !== normalizedConfirm) {
+    throw new Error("New passkey and confirmation do not match.")
+  }
+
+  if (normalizedCurrent === normalizedNext) {
+    throw new Error("Choose a new passkey that is different from the current one.")
+  }
+
+  await updateStoredAdminPasskey(normalizedCurrent, normalizedNext)
+
+  return { ok: true as const }
 }
 
 export async function createDoctorSession(userId: string) {

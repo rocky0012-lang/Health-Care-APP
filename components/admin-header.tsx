@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { Bell, Globe, LogOut, Settings, UserRound } from "lucide-react"
+import { Bell, Globe, KeyRound, LogOut, Settings, UserRound } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useRef } from "react"
@@ -77,6 +77,7 @@ export function AdminHeader({
   const isDoctorRole = userRole.toLowerCase() === "doctor"
   const profileHref = isAdminRole ? "/admin/profile" : isDoctorRole ? "/doctor/profile" : "/profile"
   const settingsHref = isAdminRole ? "/admin/settings" : isDoctorRole ? "/doctor/settings" : "/settings"
+  const resetPasswordHref = isAdminRole ? "/admin/reset-password" : null
   const languageOptions = ["English", "French", "Spanish", "Swahili"]
   const resolvedNotificationCount = notifications.length > 0 ? notifications.length : notificationCount
   const derivedAvatarInitials = (resolvedWelcomeName || userRole)
@@ -379,6 +380,9 @@ export function AdminHeader({
                 </DrawerDescription>
               </DrawerHeader>
               <div className="flex flex-col gap-2 p-4">
+                <div className="px-1 pb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Account navigation
+                </div>
                 <DrawerClose asChild>
                   <Link
                     href={profileHref}
@@ -397,6 +401,17 @@ export function AdminHeader({
                     <span>Settings</span>
                   </Link>
                 </DrawerClose>
+                {resetPasswordHref && (
+                  <DrawerClose asChild>
+                    <Link
+                      href={resetPasswordHref}
+                      className="flex items-center gap-3 rounded-lg border border-border px-4 py-3 text-sm transition-colors hover:bg-slate-100 dark:hover:bg-slate-900"
+                    >
+                      <KeyRound className="size-4" />
+                      <span>Reset Passkey</span>
+                    </Link>
+                  </DrawerClose>
+                )}
                 <DrawerClose asChild>
                   <button
                     type="button"

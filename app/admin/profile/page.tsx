@@ -6,6 +6,7 @@ import {
   BriefcaseMedical,
   CircleUserRound,
   FileText,
+  KeyRound,
   Mail,
   Phone,
   ShieldCheck,
@@ -153,6 +154,29 @@ export default function AdminProfilePage() {
                 <div className="rounded-lg border bg-white/80 px-4 py-3 dark:bg-slate-950/70">Monitor patient intake and profile accuracy.</div>
                 <div className="rounded-lg border bg-white/80 px-4 py-3 dark:bg-slate-950/70">Coordinate appointment flow and internal escalations.</div>
                 <div className="rounded-lg border bg-white/80 px-4 py-3 dark:bg-slate-950/70">Review reports and maintain clinic settings.</div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-rose-50/80 sm:col-span-2 dark:bg-rose-950/20">
+              <CardHeader>
+                <CardDescription>Security</CardDescription>
+                <CardTitle>Reset admin passkey</CardTitle>
+                <CardAction>
+                  <div className="rounded-full bg-white/90 p-2 dark:bg-slate-800">
+                    <KeyRound className="size-5 text-rose-600" />
+                  </div>
+                </CardAction>
+              </CardHeader>
+              <CardContent className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-sm text-muted-foreground">
+                  Use a dedicated security action to change the six-digit admin sign-in passkey instead of relying on a shared profile edit flow.
+                </p>
+                <Button asChild>
+                  <Link href="/admin/reset-password">
+                    <KeyRound className="mr-2 size-4" />
+                    Reset Passkey
+                  </Link>
+                </Button>
               </CardContent>
             </Card>
           </div>
