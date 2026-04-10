@@ -109,6 +109,7 @@ function normalizeDoctorNotifications(notifications: unknown): DoctorAdminNotifi
       const title = typeof candidate.title === "string" ? candidate.title.trim() : ""
       const message = typeof candidate.message === "string" ? candidate.message.trim() : ""
       const createdAt = typeof candidate.createdAt === "string" ? candidate.createdAt : ""
+      const readAt = typeof candidate.readAt === "string" && candidate.readAt.trim() ? candidate.readAt : undefined
 
       if (!title || !message || !createdAt) {
         continue
@@ -120,6 +121,7 @@ function normalizeDoctorNotifications(notifications: unknown): DoctorAdminNotifi
         message,
         tone: normalizeDoctorNotificationTone(candidate.tone),
         createdAt,
+        readAt,
         kind: candidate.kind === "status" ? "status" : "admin-message",
         status:
           candidate.status === "active" ||
@@ -154,9 +156,39 @@ function buildDoctorNotification({
     message: message.trim(),
     tone,
     createdAt: new Date().toISOString(),
+    readAt: undefined,
     kind,
     status,
   }
+}
+
+async function getDoctorPrefsRecord(userId: string) {
+  return users
+    .getPrefs<Record<string, any>>({ userId })
+    .catch(() => ({} as Record<string, any>))
+}
+
+async function updateDoctorNotifications(
+  userId: string,
+  updater: (notifications: DoctorAdminNotification[]) => DoctorAdminNotification[]
+) {
+  if (!userId) {
+    throw new Error("Missing doctor userId for notification update.")
+  }
+
+  const existingPrefs = await getDoctorPrefsRecord(userId)
+  const normalizedNotifications = normalizeDoctorNotifications(existingPrefs.adminNotifications)
+  const nextNotifications = updater(normalizedNotifications)
+
+  await users.updatePrefs({
+    userId,
+    prefs: {
+      ...existingPrefs,
+      adminNotifications: nextNotifications,
+    },
+  })
+
+  return parseStringify(nextNotifications)
 }
 
 function assertDoctorStatusMessage(status: DoctorAccountStatus, message?: string) {
@@ -200,9 +232,7 @@ async function updateDoctorStatusPrefs(
 
   assertDoctorStatusMessage(status, message)
 
-  const existingPrefs = await users
-    .getPrefs<Record<string, any>>({ userId })
-    .catch(() => ({} as Record<string, any>))
+  const existingPrefs = await getDoctorPrefsRecord(userId)
   const normalizedMessage = normalizeDoctorStatusMessage(message)
   const normalizedNotifications = normalizeDoctorNotifications(existingPrefs.adminNotifications)
 
@@ -543,9 +573,7 @@ export const sendDoctorNotification = async ({
     throw new Error("Enter a notification message before sending it to the doctor.")
   }
 
-  const existingPrefs = await users
-    .getPrefs<Record<string, any>>({ userId })
-    .catch(() => ({} as Record<string, any>))
+  const existingPrefs = await getDoctorPrefsRecord(userId)
   const normalizedNotifications = normalizeDoctorNotifications(existingPrefs.adminNotifications)
 
   const nextPrefs = {
@@ -567,6 +595,33 @@ export const sendDoctorNotification = async ({
   })
 
   return parseStringify(nextPrefs.adminNotifications[0])
+}
+
+export const markDoctorNotificationReadState = async ({
+  userId,
+  notificationId,
+  read,
+}: {
+  userId: string
+  notificationId: string
+  read: boolean
+}) => {
+  if (!notificationId) {
+    throw new Error("Missing notification id.")
+  }
+
+  const nextReadAt = read ? new Date().toISOString() : undefined
+
+  return updateDoctorNotifications(userId, (notifications) =>
+    notifications.map((notification) =>
+      notification.id === notificationId
+        ? {
+            ...notification,
+            readAt: nextReadAt,
+          }
+        : notification
+    )
+  )
 }
 
 export const updateDoctorWeeklySchedule = async ({

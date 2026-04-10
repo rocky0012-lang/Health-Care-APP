@@ -5,6 +5,8 @@ import Link from "next/link"
 import {
   AlertTriangle,
   CalendarDays,
+  ChevronDown,
+  ChevronUp,
   ClipboardList,
   LayoutDashboard,
   LogOut,
@@ -58,6 +60,7 @@ const navItems = [
 
 export default function PatientsPage() {
   const [patients, setPatients] = useState<Awaited<ReturnType<typeof listPatients>>>([])
+  const [expandedPatientId, setExpandedPatientId] = useState("")
   const [searchQuery, setSearchQuery] = useState("")
   const [statusFilter, setStatusFilter] = useState<PatientAccountStatus | "all">("all")
   const [saveMessage, setSaveMessage] = useState("")
@@ -444,8 +447,9 @@ export default function PatientsPage() {
 
                   return (
                     <div key={patient.$id} className="rounded-xl border px-4 py-4">
-                      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                        <div className="flex items-start gap-4">
+                      <div className="flex flex-col gap-4">
+                        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                          <div className="flex items-center gap-4">
                           <Avatar size="lg" className="mt-0.5 size-14 shrink-0">
                             <AvatarImage src={patient.avatarUrl || ""} alt={`${patient.name} profile picture`} />
                             <AvatarFallback className="bg-blue-500 text-white">
@@ -470,19 +474,32 @@ export default function PatientsPage() {
                               {patientStatus.charAt(0).toUpperCase() + patientStatus.slice(1)}
                             </span>
                             <p className="text-sm text-muted-foreground">{patient.email} • {patient.phone}</p>
-                            <div className="grid gap-2 text-sm text-muted-foreground md:grid-cols-2 xl:grid-cols-3">
-                              <div><span className="font-medium text-foreground">Physician:</span> {patient.primaryPhysician || "Not assigned"}</div>
-                              <div><span className="font-medium text-foreground">Emergency Contact:</span> {patient.emergencyContactName || "Not set"}</div>
-                              <div><span className="font-medium text-foreground">Occupation:</span> {patient.occupation || "Not provided"}</div>
-                              <div><span className="font-medium text-foreground">Address:</span> {patient.address || "Not provided"}</div>
-                              <div><span className="font-medium text-foreground">Insurance:</span> {patient.insuranceProvider || "Not provided"}</div>
-                              <div><span className="font-medium text-foreground">Patient ID:</span> {patient.identificationNumber || "Not set"}</div>
-                            </div>
+                            <p className="text-sm text-muted-foreground">
+                              Physician: {patient.primaryPhysician || "Not assigned"}
+                            </p>
                           </div>
+                        </div>
+                          <button
+                            type="button"
+                            onClick={() => setExpandedPatientId((current) => (current === patient.$id ? "" : patient.$id))}
+                            className="inline-flex items-center justify-between rounded-lg border border-input bg-background px-3 py-2 text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-900 lg:w-56"
+                          >
+                            <span>{expandedPatientId === patient.$id ? "Hide details" : "View details"}</span>
+                            {expandedPatientId === patient.$id ? <ChevronUp className="size-4" /> : <ChevronDown className="size-4" />}
+                          </button>
                         </div>
                       </div>
 
+                      {expandedPatientId === patient.$id ? (
                       <div className="mt-4 grid gap-3 rounded-lg border bg-slate-50/80 p-3 dark:bg-slate-950/60">
+                        <div className="grid gap-2 text-sm text-muted-foreground md:grid-cols-2 xl:grid-cols-3">
+                          <div><span className="font-medium text-foreground">Physician:</span> {patient.primaryPhysician || "Not assigned"}</div>
+                          <div><span className="font-medium text-foreground">Emergency Contact:</span> {patient.emergencyContactName || "Not set"}</div>
+                          <div><span className="font-medium text-foreground">Occupation:</span> {patient.occupation || "Not provided"}</div>
+                          <div><span className="font-medium text-foreground">Address:</span> {patient.address || "Not provided"}</div>
+                          <div><span className="font-medium text-foreground">Insurance:</span> {patient.insuranceProvider || "Not provided"}</div>
+                          <div><span className="font-medium text-foreground">Patient ID:</span> {patient.identificationNumber || "Not set"}</div>
+                        </div>
                         <div className="grid gap-3 md:grid-cols-[180px_minmax(0,1fr)_auto] md:items-start">
                           <select
                             className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
@@ -546,6 +563,7 @@ export default function PatientsPage() {
                           Saved patient notifications: {patient.adminNotifications?.length || 0}
                         </p>
                       </div>
+                      ) : null}
                     </div>
                   )
                 })

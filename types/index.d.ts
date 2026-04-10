@@ -14,6 +14,8 @@ declare type PatientAccountStatus = "active" | "deactivated" | "suspended";
 declare type DoctorNotificationTone = "default" | "warning" | "success";
 declare type PatientNotificationKind = "status" | "admin-message" | "emergency-message" | "broadcast" | "doctor-message" | "appointment-update";
 declare type DoctorScheduleDayKey = "monday" | "tuesday" | "wednesday" | "thursday" | "friday";
+declare type PaymentMethodKind = "card" | "mobile" | "bank";
+declare type PaymentCardBrand = "visa" | "mastercard" | "amex" | "discover" | "verve" | "unknown";
 
 declare interface DoctorWeeklyScheduleDay {
   enabled: boolean;
@@ -29,6 +31,7 @@ declare interface DoctorAdminNotification {
   message: string;
   tone: DoctorNotificationTone;
   createdAt: string;
+  readAt?: string;
   kind: "status" | "admin-message";
   status?: DoctorAccountStatus;
 }
@@ -42,6 +45,24 @@ declare interface PatientAdminNotification {
   readAt?: string;
   kind: PatientNotificationKind;
   status?: PatientAccountStatus;
+}
+
+declare interface PatientSavedPaymentMethod {
+  method: PaymentMethodKind;
+  brand?: PaymentCardBrand;
+  nameOnAccount: string;
+  last4?: string;
+  expiryMonth?: string;
+  expiryYear?: string;
+  referenceHint?: string;
+  notes?: string;
+  updatedAt: string;
+}
+
+declare interface PatientBillingPreferences {
+  savePaymentMethod: boolean;
+  emailReceipt: boolean;
+  updatedAt: string;
 }
 
 declare interface CreateUserParams {

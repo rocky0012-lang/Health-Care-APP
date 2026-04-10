@@ -51,6 +51,7 @@ interface AdminHeaderProps {
   welcomeName?: string
   subNavItems?: Array<{ label: string; href: string; active?: boolean }>
   showPageTitleInWelcome?: boolean
+  onMarkNotificationRead?: (notificationId: string) => Promise<void> | void
 }
 
 export function AdminHeader({
@@ -63,6 +64,7 @@ export function AdminHeader({
   welcomeName,
   subNavItems,
   showPageTitleInWelcome = true,
+  onMarkNotificationRead,
 }: AdminHeaderProps) {
   const [time, setTime] = useState("")
   const [avatarImage, setAvatarImage] = useState("")
@@ -351,6 +353,15 @@ export function AdminHeader({
                               {new Date(notification.createdAt).toLocaleString()}
                             </p>
                           )}
+                          {onMarkNotificationRead ? (
+                            <button
+                              type="button"
+                              onClick={() => void onMarkNotificationRead(notification.id)}
+                              className="mt-3 text-xs font-semibold uppercase tracking-[0.08em] text-blue-600 transition-colors hover:text-blue-700"
+                            >
+                              Mark as Read
+                            </button>
+                          ) : null}
                         </div>
                       )
                     })}

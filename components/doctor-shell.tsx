@@ -13,7 +13,7 @@ import {
 } from "lucide-react"
 
 import { AdminHeader } from "@/components/admin-header"
-import { getDoctorByUserId } from "@/lib/actions/doctor.action"
+import { getDoctorByUserId, markDoctorNotificationReadState } from "@/lib/actions/doctor.action"
 import { clearDoctorSessionCookie } from "@/lib/actions/auth-session.action"
 import {
   Sidebar,
@@ -59,6 +59,20 @@ export function DoctorShell({ pageTitle, pageDescription, children }: DoctorShel
   const [notifications, setNotifications] = useState<
     Array<{ id: string; title: string; message: string; createdAt?: string; tone: "default" | "warning" | "success" }>
   >([])
+
+  const syncUnreadNotifications = (doctorNotifications: DoctorAdminNotification[]) => {
+    setNotifications(
+      doctorNotifications
+        .filter((notification) => !notification.readAt)
+        .map((notification) => ({
+          id: notification.id,
+          title: notification.title,
+          message: notification.message,
+          createdAt: notification.createdAt,
+          tone: notification.tone,
+        }))
+    )
+  }
 
   const isActiveStatusMessageVisible = (updatedAt?: string) => {
     if (!updatedAt) {
@@ -106,15 +120,7 @@ export function DoctorShell({ pageTitle, pageDescription, children }: DoctorShel
           doctor.accountStatusMessage &&
           isActiveStatusMessageVisible(doctor.accountStatusMessageUpdatedAt)
 
-        setNotifications(
-          (doctor.adminNotifications || []).map((notification) => ({
-            id: notification.id,
-            title: notification.title,
-            message: notification.message,
-            createdAt: notification.createdAt,
-            tone: notification.tone,
-          }))
-        )
+        syncUnreadNotifications(doctor.adminNotifications || [])
 
         if (doctor.accountStatus !== "active" || hasVisibleActiveNotice) {
           const resolvedMessage =
@@ -244,6 +250,21 @@ export function DoctorShell({ pageTitle, pageDescription, children }: DoctorShel
           pageTitle={pageTitle}
           pageDescription={pageDescription}
           notifications={notifications}
+          onMarkNotificationRead={async (notificationId) => {
+            const currentUserId = getCurrentDoctorUserId()
+
+            if (!currentUserId) {
+              return
+            }
+
+            const updatedNotifications = await markDoctorNotificationReadState({
+              userId: currentUserId,
+              notificationId,
+              read: true,
+            })
+
+            syncUnreadNotifications(updatedNotifications)
+          }}
           subNavItems={navItems.map((item) => ({
             label: item.label,
             href: item.href,

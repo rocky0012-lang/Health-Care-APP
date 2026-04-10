@@ -6,6 +6,8 @@ import { Controller, type SubmitHandler, useForm } from "react-hook-form"
 import { z } from "zod"
 import { zodResolver } from "@hookform/resolvers/zod"
 import {
+  ChevronDown,
+  ChevronUp,
   CalendarDays,
   ClipboardList,
   LayoutDashboard,
@@ -18,6 +20,7 @@ import {
 import { Search } from "lucide-react"
 
 import { AdminHeader } from "@/components/admin-header"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import {
   Field,
@@ -166,6 +169,7 @@ type DoctorListItem = Awaited<ReturnType<typeof listDoctors>>[number]
 
 export default function AdminDoctorsPage() {
   const [recentDoctors, setRecentDoctors] = useState<DoctorListItem[]>([])
+  const [expandedDoctorId, setExpandedDoctorId] = useState("")
   const [doctorSearchQuery, setDoctorSearchQuery] = useState("")
   const [doctorStatusFilter, setDoctorStatusFilter] = useState<DoctorAccountStatus | "all">("all")
   const [saveMessage, setSaveMessage] = useState("")
@@ -731,99 +735,129 @@ export default function AdminDoctorsPage() {
                 ) : (
                   filteredDoctors.map((doctor) => (
                     <div key={doctor.$id} className="rounded-lg border px-4 py-3">
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <p className="font-medium text-foreground">{doctor.name || doctor.fullName}</p>
-                          <p className="text-sm text-muted-foreground">{doctor.email}</p>
-                          <p className="mt-1 text-sm text-muted-foreground">
-                            {doctor.specialization || doctor.specialty || "No specialty"}
-                            {doctor.department || doctor.hospitalName
-                              ? ` • ${doctor.department || doctor.hospitalName}`
-                              : ""}
-                          </p>
-                        </div>
-                        <div className="flex flex-col items-end gap-2">
-                          <span
-                            className={`rounded-full px-2.5 py-1 text-xs font-medium ${getDoctorStatusBadgeClass(
-                              doctor.accountStatus || "active"
-                            )}`}
-                          >
-                            {getDoctorStatusLabel(doctor.accountStatus || "active")}
-                          </span>
-                          <Button type="button" variant="outline" size="sm" onClick={() => loadDoctorIntoForm(doctor)}>
-                            <SquarePen className="mr-2 size-4" />
-                            Edit
-                          </Button>
-                        </div>
-                      </div>
-                      <div className="mt-4 rounded-lg border bg-white/80 p-3 dark:bg-slate-950/70">
-                        <div className="mb-2 flex items-center justify-between gap-3">
-                          <p className="text-sm font-medium text-foreground">Weekly schedule</p>
-                          <p className="text-xs text-muted-foreground">Mon-Fri availability</p>
-                        </div>
-                        <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
-                          {weekdayScheduleItems.map((day) => (
-                            <div
-                              key={day.key}
-                              className="rounded-md border bg-slate-50 px-3 py-2 text-xs dark:bg-slate-900/70"
-                            >
-                              <p className="font-medium text-foreground">{day.label}</p>
-                              <p className="mt-1 text-muted-foreground">
-                                {formatDoctorDaySchedule(doctor.weeklySchedule, day.key)}
+                      <div className="flex flex-col gap-4">
+                        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                          <div className="flex items-center gap-3">
+                            <Avatar size="sm" className="size-10">
+                              <AvatarImage src={doctor.avatarUrl || doctor.profilePhoto || ""} alt={doctor.name || doctor.fullName} />
+                              <AvatarFallback className="bg-blue-500 text-white">
+                                {(doctor.name || doctor.fullName || "DR")
+                                  .split(" ")
+                                  .filter(Boolean)
+                                  .slice(0, 2)
+                                  .map((part: string) => part[0])
+                                  .join("") || "DR"}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div>
+                              <p className="font-medium text-foreground">{doctor.name || doctor.fullName}</p>
+                              <p className="text-sm text-muted-foreground">{doctor.email}</p>
+                              <p className="mt-1 text-sm text-muted-foreground">
+                                {doctor.specialization || doctor.specialty || "No specialty"}
+                                {doctor.department || doctor.hospitalName
+                                  ? ` • ${doctor.department || doctor.hospitalName}`
+                                  : ""}
                               </p>
                             </div>
-                          ))}
+                          </div>
+                          <div className="flex flex-col items-start gap-2 lg:items-end">
+                            <span
+                              className={`rounded-full px-2.5 py-1 text-xs font-medium ${getDoctorStatusBadgeClass(
+                                doctor.accountStatus || "active"
+                              )}`}
+                            >
+                              {getDoctorStatusLabel(doctor.accountStatus || "active")}
+                            </span>
+                            <div className="flex gap-2">
+                              <Button type="button" variant="outline" size="sm" onClick={() => loadDoctorIntoForm(doctor)}>
+                                <SquarePen className="mr-2 size-4" />
+                                Edit
+                              </Button>
+                              <button
+                                type="button"
+                                onClick={() => setExpandedDoctorId((current) => (current === doctor.$id ? "" : doctor.$id))}
+                                className="inline-flex items-center justify-between rounded-lg border border-input bg-background px-3 py-2 text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-900"
+                              >
+                                <span>{expandedDoctorId === doctor.$id ? "Hide details" : "View details"}</span>
+                                {expandedDoctorId === doctor.$id ? <ChevronUp className="ml-2 size-4" /> : <ChevronDown className="ml-2 size-4" />}
+                              </button>
+                            </div>
+                          </div>
                         </div>
                       </div>
-                      <div className="mt-4 grid gap-3 rounded-lg border bg-slate-50/80 p-3 dark:bg-slate-950/60">
-                        <div className="grid gap-3 md:grid-cols-[180px_minmax(0,1fr)_auto] md:items-start">
-                          <select
-                            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                            value={rowStatusDrafts[doctor.$id]?.status || doctor.accountStatus || "active"}
-                            onChange={(event) =>
-                              updateRowStatusDraft(doctor.$id, {
-                                status: event.target.value as DoctorAccountStatus,
-                              })
-                            }
-                          >
-                            {doctorStatusOptions.map((status) => (
-                              <option key={status} value={status}>
-                                {getDoctorStatusLabel(status)}
-                              </option>
-                            ))}
-                          </select>
-                          <Textarea
-                            value={rowStatusDrafts[doctor.$id]?.message ?? doctor.accountStatusMessage ?? ""}
-                            onChange={(event) =>
-                              updateRowStatusDraft(doctor.$id, {
-                                message: event.target.value,
-                              })
-                            }
-                            placeholder="Reason shown to doctor when status is suspended or deactivated"
-                            className="min-h-24"
-                          />
-                          <Button type="button" onClick={() => void handleRowStatusSave(doctor)}>
-                            Save status
-                          </Button>
-                        </div>
-                        <p className="text-xs text-muted-foreground">
-                          Admin note shown to doctor: {doctor.accountStatusMessage || "No message set."}
-                        </p>
-                        <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-start">
-                          <Textarea
-                            value={rowNotificationDrafts[doctor.$id] || ""}
-                            onChange={(event) => updateRowNotificationDraft(doctor.$id, event.target.value)}
-                            placeholder="Send a notification to this doctor that will appear in the bell dropdown"
-                            className="min-h-24"
-                          />
-                          <Button type="button" variant="secondary" onClick={() => void handleSendDoctorNotification(doctor)}>
-                            Send notification
-                          </Button>
-                        </div>
-                        <p className="text-xs text-muted-foreground">
-                          Saved messages in notification bell: {doctor.adminNotifications?.length || 0}
-                        </p>
-                      </div>
+
+                      {expandedDoctorId === doctor.$id ? (
+                        <>
+                          <div className="mt-4 rounded-lg border bg-white/80 p-3 dark:bg-slate-950/70">
+                            <div className="mb-2 flex items-center justify-between gap-3">
+                              <p className="text-sm font-medium text-foreground">Weekly schedule</p>
+                              <p className="text-xs text-muted-foreground">Mon-Fri availability</p>
+                            </div>
+                            <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
+                              {weekdayScheduleItems.map((day) => (
+                                <div
+                                  key={day.key}
+                                  className="rounded-md border bg-slate-50 px-3 py-2 text-xs dark:bg-slate-900/70"
+                                >
+                                  <p className="font-medium text-foreground">{day.label}</p>
+                                  <p className="mt-1 text-muted-foreground">
+                                    {formatDoctorDaySchedule(doctor.weeklySchedule, day.key)}
+                                  </p>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                          <div className="mt-4 grid gap-3 rounded-lg border bg-slate-50/80 p-3 dark:bg-slate-950/60">
+                            <div className="grid gap-3 md:grid-cols-[180px_minmax(0,1fr)_auto] md:items-start">
+                              <select
+                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                                value={rowStatusDrafts[doctor.$id]?.status || doctor.accountStatus || "active"}
+                                onChange={(event) =>
+                                  updateRowStatusDraft(doctor.$id, {
+                                    status: event.target.value as DoctorAccountStatus,
+                                  })
+                                }
+                              >
+                                {doctorStatusOptions.map((status) => (
+                                  <option key={status} value={status}>
+                                    {getDoctorStatusLabel(status)}
+                                  </option>
+                                ))}
+                              </select>
+                              <Textarea
+                                value={rowStatusDrafts[doctor.$id]?.message ?? doctor.accountStatusMessage ?? ""}
+                                onChange={(event) =>
+                                  updateRowStatusDraft(doctor.$id, {
+                                    message: event.target.value,
+                                  })
+                                }
+                                placeholder="Reason shown to doctor when status is suspended or deactivated"
+                                className="min-h-24"
+                              />
+                              <Button type="button" onClick={() => void handleRowStatusSave(doctor)}>
+                                Save status
+                              </Button>
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                              Admin note shown to doctor: {doctor.accountStatusMessage || "No message set."}
+                            </p>
+                            <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-start">
+                              <Textarea
+                                value={rowNotificationDrafts[doctor.$id] || ""}
+                                onChange={(event) => updateRowNotificationDraft(doctor.$id, event.target.value)}
+                                placeholder="Send a notification to this doctor that will appear in the bell dropdown"
+                                className="min-h-24"
+                              />
+                              <Button type="button" variant="secondary" onClick={() => void handleSendDoctorNotification(doctor)}>
+                                Send notification
+                              </Button>
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                              Saved messages in notification bell: {doctor.adminNotifications?.length || 0}
+                            </p>
+                          </div>
+                        </>
+                      ) : null}
                     </div>
                   ))
                 )}

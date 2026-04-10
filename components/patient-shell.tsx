@@ -15,7 +15,7 @@ import {
 
 import { AdminHeader } from "@/components/admin-header"
 import { clearPatientSessions } from "@/lib/actions/auth-session.action"
-import { getPatientByUserId } from "@/lib/actions/patient.action"
+import { getPatientByUserId, markPatientNotificationReadState } from "@/lib/actions/patient.action"
 import {
   Sidebar,
   SidebarContent,
@@ -74,6 +74,30 @@ export function PatientShell({ pageTitle, pageDescription, children }: PatientSh
     { title: string; message: string; tone: "default" | "warning" | "success" } | null
   >(null)
 
+  const syncUnreadNotifications = (patientNotifications: PatientAdminNotification[]) => {
+    const visibleNotifications = patientNotifications
+      .filter((notification) => isActiveStatusNoticeVisible(notification))
+      .filter((notification) => !notification.readAt)
+      .map((notification) => ({
+        id: notification.id,
+        title: notification.title,
+        message: notification.message,
+        createdAt: notification.createdAt,
+        tone: notification.tone,
+      }))
+
+    setNotifications(visibleNotifications)
+    setTopNotice(
+      visibleNotifications.length > 0
+        ? {
+            title: visibleNotifications[0].title,
+            message: visibleNotifications[0].message,
+            tone: visibleNotifications[0].tone,
+          }
+        : null
+    )
+  }
+
   useEffect(() => {
     const currentUserId = getCurrentPatientUserId()
     const storedName = getStoredPatientName(currentUserId)
@@ -102,27 +126,7 @@ export function PatientShell({ pageTitle, pageDescription, children }: PatientSh
           setPatientName(patient.name)
         }
 
-        const visibleNotifications = (patient.adminNotifications || [])
-          .filter((notification) => isActiveStatusNoticeVisible(notification))
-          .filter((notification) => !notification.readAt)
-          .map((notification) => ({
-            id: notification.id,
-            title: notification.title,
-            message: notification.message,
-            createdAt: notification.createdAt,
-            tone: notification.tone,
-          }))
-
-        setNotifications(visibleNotifications)
-        setTopNotice(
-          visibleNotifications.length > 0
-            ? {
-                title: visibleNotifications[0].title,
-                message: visibleNotifications[0].message,
-                tone: visibleNotifications[0].tone,
-              }
-            : null
-        )
+        syncUnreadNotifications(patient.adminNotifications || [])
       } catch (error) {
         console.error("Failed to load patient notifications", error)
       }
@@ -224,6 +228,21 @@ export function PatientShell({ pageTitle, pageDescription, children }: PatientSh
           pageTitle={pageTitle}
           pageDescription={pageDescription}
           notifications={notifications}
+          onMarkNotificationRead={async (notificationId) => {
+            const currentUserId = getCurrentPatientUserId()
+
+            if (!currentUserId) {
+              return
+            }
+
+            const updatedNotifications = await markPatientNotificationReadState({
+              userId: currentUserId,
+              notificationId,
+              read: true,
+            })
+
+            syncUnreadNotifications(updatedNotifications)
+          }}
           subNavItems={navItems.map((item) => ({
             label: item.label === "Overview" ? "My Dashboard" : item.label,
             href: item.href,

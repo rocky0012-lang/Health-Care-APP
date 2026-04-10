@@ -30,6 +30,8 @@ export interface Patient extends Models.Document {
   accountStatusMessage?: string;
   accountStatusMessageUpdatedAt?: string;
   adminNotifications?: PatientAdminNotification[];
+  savedPaymentMethod?: PatientSavedPaymentMethod;
+  billingPreferences?: PatientBillingPreferences;
 }
 
 export interface Doctor extends Models.Document {

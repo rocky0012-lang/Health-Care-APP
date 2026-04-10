@@ -14,6 +14,82 @@ type PatientStatusPrefs = {
     accountStatusMessage?: string
     accountStatusMessageUpdatedAt?: string
     adminNotifications?: PatientAdminNotification[]
+    savedPaymentMethod?: PatientSavedPaymentMethod
+    billingPreferences?: PatientBillingPreferences
+}
+
+const DEFAULT_PATIENT_BILLING_PREFERENCES: PatientBillingPreferences = {
+    savePaymentMethod: true,
+    emailReceipt: true,
+    updatedAt: "",
+}
+
+function normalizePaymentMethodKind(value?: string): PaymentMethodKind {
+    if (value === "mobile" || value === "bank") {
+        return value
+    }
+
+    return "card"
+}
+
+function normalizePaymentCardBrand(value?: string): PaymentCardBrand {
+    if (
+        value === "visa" ||
+        value === "mastercard" ||
+        value === "amex" ||
+        value === "discover" ||
+        value === "verve"
+    ) {
+        return value
+    }
+
+    return "unknown"
+}
+
+function normalizePatientSavedPaymentMethod(value: unknown): PatientSavedPaymentMethod | undefined {
+    if (!value || typeof value !== "object") {
+        return undefined
+    }
+
+    const candidate = value as Partial<PatientSavedPaymentMethod>
+    const nameOnAccount = typeof candidate.nameOnAccount === "string" ? candidate.nameOnAccount.trim() : ""
+    const updatedAt = typeof candidate.updatedAt === "string" ? candidate.updatedAt : ""
+
+    if (!nameOnAccount || !updatedAt) {
+        return undefined
+    }
+
+    const last4 = typeof candidate.last4 === "string" ? candidate.last4.replace(/\D/g, "").slice(-4) : undefined
+    const expiryMonth = typeof candidate.expiryMonth === "string" ? candidate.expiryMonth.replace(/\D/g, "").slice(0, 2) : undefined
+    const expiryYear = typeof candidate.expiryYear === "string" ? candidate.expiryYear.replace(/\D/g, "").slice(0, 4) : undefined
+    const referenceHint = typeof candidate.referenceHint === "string" ? candidate.referenceHint.trim() : undefined
+    const notes = typeof candidate.notes === "string" ? candidate.notes.trim() : undefined
+
+    return {
+        method: normalizePaymentMethodKind(candidate.method),
+        brand: normalizePaymentCardBrand(candidate.brand),
+        nameOnAccount,
+        last4: last4 || undefined,
+        expiryMonth: expiryMonth || undefined,
+        expiryYear: expiryYear || undefined,
+        referenceHint: referenceHint || undefined,
+        notes: notes || undefined,
+        updatedAt,
+    }
+}
+
+function normalizePatientBillingPreferences(value: unknown): PatientBillingPreferences {
+    if (!value || typeof value !== "object") {
+        return DEFAULT_PATIENT_BILLING_PREFERENCES
+    }
+
+    const candidate = value as Partial<PatientBillingPreferences>
+
+    return {
+        savePaymentMethod: candidate.savePaymentMethod !== false,
+        emailReceipt: candidate.emailReceipt !== false,
+        updatedAt: typeof candidate.updatedAt === "string" ? candidate.updatedAt : "",
+    }
 }
 
 function normalizePatientStatus(status?: string): PatientAccountStatus {
@@ -198,6 +274,8 @@ function serializePatient<T extends Record<string, any>>(patient: T | null): (T 
     accountStatusMessage?: string
     accountStatusMessageUpdatedAt?: string
     adminNotifications: PatientAdminNotification[]
+    savedPaymentMethod?: PatientSavedPaymentMethod
+    billingPreferences: PatientBillingPreferences
 }) | null {
     if (!patient) {
         return null
@@ -216,6 +294,8 @@ function serializePatient<T extends Record<string, any>>(patient: T | null): (T 
                 ? patient.accountStatusMessageUpdatedAt
                 : undefined,
         adminNotifications: normalizePatientNotifications(patient.adminNotifications),
+        savedPaymentMethod: normalizePatientSavedPaymentMethod(patient.savedPaymentMethod),
+        billingPreferences: normalizePatientBillingPreferences(patient.billingPreferences),
     })
 }
 
@@ -235,6 +315,8 @@ async function getPatientStatusPrefs(userId: string): Promise<PatientStatusPrefs
                     ? prefs.accountStatusMessageUpdatedAt
                     : undefined,
             adminNotifications: normalizePatientNotifications(prefs?.adminNotifications),
+            savedPaymentMethod: normalizePatientSavedPaymentMethod(prefs?.savedPaymentMethod),
+            billingPreferences: normalizePatientBillingPreferences(prefs?.billingPreferences),
         }
     } catch (error) {
         console.error("getPatientStatusPrefs error:", error)
@@ -256,6 +338,8 @@ async function withPatientStatus<T extends Record<string, any>>(patient: T | nul
         accountStatusMessage: statusPrefs.accountStatusMessage,
         accountStatusMessageUpdatedAt: statusPrefs.accountStatusMessageUpdatedAt,
         adminNotifications: statusPrefs.adminNotifications || [],
+        savedPaymentMethod: statusPrefs.savedPaymentMethod,
+        billingPreferences: statusPrefs.billingPreferences || DEFAULT_PATIENT_BILLING_PREFERENCES,
     }
 }
 
@@ -708,6 +792,149 @@ export const markAllPatientNotificationsAsRead = async (userId: string) => {
             readAt: notification.readAt || markedAt,
         }))
     )
+}
+
+export const getPatientSavedPaymentMethod = async (userId: string) => {
+    if (!userId) {
+        return null
+    }
+
+    const prefs = await getPatientStatusPrefs(userId)
+    return parseStringify(prefs.savedPaymentMethod || null)
+}
+
+export const getPatientBillingPreferences = async (userId: string) => {
+    if (!userId) {
+        return parseStringify(DEFAULT_PATIENT_BILLING_PREFERENCES)
+    }
+
+    const prefs = await getPatientStatusPrefs(userId)
+    return parseStringify(prefs.billingPreferences || DEFAULT_PATIENT_BILLING_PREFERENCES)
+}
+
+export const removePatientSavedPaymentMethod = async (userId: string) => {
+    if (!userId) {
+        throw new Error("Missing patient userId for payment method removal.")
+    }
+
+    const existingPrefs = await getPatientPrefsRecord(userId)
+    const { savedPaymentMethod: _savedPaymentMethod, ...remainingPrefs } = existingPrefs
+
+    await users.updatePrefs({
+        userId,
+        prefs: remainingPrefs,
+    })
+
+    return parseStringify({ success: true })
+}
+
+export const savePatientBillingPreferences = async ({
+    userId,
+    savePaymentMethod,
+    emailReceipt,
+}: {
+    userId: string
+    savePaymentMethod: boolean
+    emailReceipt: boolean
+}) => {
+    if (!userId) {
+        throw new Error("Missing patient account for billing preference save.")
+    }
+
+    const existingPrefs = await getPatientPrefsRecord(userId)
+    const nextBillingPreferences: PatientBillingPreferences = {
+        savePaymentMethod,
+        emailReceipt,
+        updatedAt: new Date().toISOString(),
+    }
+
+    await users.updatePrefs({
+        userId,
+        prefs: {
+            ...existingPrefs,
+            billingPreferences: nextBillingPreferences,
+        },
+    })
+
+    return parseStringify(nextBillingPreferences)
+}
+
+export const savePatientPaymentMethod = async ({
+    userId,
+    method,
+    brand,
+    nameOnAccount,
+    referenceNumber,
+    expiryMonth,
+    expiryYear,
+    notes,
+}: {
+    userId: string
+    method: PaymentMethodKind
+    brand?: PaymentCardBrand
+    nameOnAccount: string
+    referenceNumber: string
+    expiryMonth?: string
+    expiryYear?: string
+    notes?: string
+}) => {
+    if (!userId) {
+        throw new Error("Missing patient account for payment method save.")
+    }
+
+    const normalizedMethod = normalizePaymentMethodKind(method)
+    const normalizedBrand = normalizePaymentCardBrand(brand)
+    const normalizedName = nameOnAccount.trim()
+    const digitsOnlyReference = referenceNumber.replace(/\D/g, "")
+    const normalizedNotes = notes?.trim() || undefined
+
+    if (normalizedName.length < 2) {
+        throw new Error("Enter the name attached to this payment method.")
+    }
+
+    if (normalizedMethod === "bank") {
+        if (digitsOnlyReference.length < 10) {
+            throw new Error("Enter a valid bank or account reference.")
+        }
+    } else {
+        if (digitsOnlyReference.length < 16 || digitsOnlyReference.length > 19) {
+            throw new Error("Enter a valid card number before saving the payment method.")
+        }
+
+        if (!expiryMonth || !/^\d{2}$/.test(expiryMonth)) {
+            throw new Error("Select a valid expiry month.")
+        }
+
+        if (!expiryYear || !/^\d{4}$/.test(expiryYear)) {
+            throw new Error("Select a valid expiry year.")
+        }
+    }
+
+    const existingPrefs = await getPatientPrefsRecord(userId)
+    const nextPaymentMethod: PatientSavedPaymentMethod = {
+        method: normalizedMethod,
+        brand: normalizedMethod === "bank" ? undefined : normalizedBrand,
+        nameOnAccount: normalizedName,
+        last4: digitsOnlyReference.slice(-4),
+        expiryMonth: normalizedMethod === "bank" ? undefined : expiryMonth,
+        expiryYear: normalizedMethod === "bank" ? undefined : expiryYear,
+        referenceHint:
+            normalizedMethod === "bank"
+                ? `Account ending ${digitsOnlyReference.slice(-4)}`
+                : `${normalizedBrand === "unknown" ? "Card" : normalizedBrand} ending ${digitsOnlyReference.slice(-4)}`,
+        notes: normalizedNotes,
+        updatedAt: new Date().toISOString(),
+    }
+
+    await users.updatePrefs({
+        userId,
+        prefs: {
+            ...existingPrefs,
+            savedPaymentMethod: nextPaymentMethod,
+        },
+    })
+
+    return parseStringify(nextPaymentMethod)
 }
 
 export const sendBroadcastPatientNotification = async ({

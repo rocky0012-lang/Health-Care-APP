@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { CalendarClock, CircleAlert, FileClock } from "lucide-react"
+import { CalendarClock, ChevronDown, ChevronUp, CircleAlert, FileClock } from "lucide-react"
 
 import { DoctorShell } from "@/components/doctor-shell"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -72,9 +72,20 @@ function isSameLocalDay(left: Date, right: Date) {
   )
 }
 
+function getAppointmentTimestamp(appointment: DoctorAppointmentRecord) {
+  const appointmentDate = appointment.appointment_date ? new Date(appointment.appointment_date) : null
+
+  if (!appointmentDate || Number.isNaN(appointmentDate.getTime())) {
+    return Number.POSITIVE_INFINITY
+  }
+
+  return appointmentDate.getTime()
+}
+
 export default function DoctorAppointmentsPage() {
   const [doctorUserId, setDoctorUserId] = useState("")
   const [appointments, setAppointments] = useState<DoctorAppointmentRecord[]>([])
+  const [expandedAppointmentId, setExpandedAppointmentId] = useState("")
   const [draftStatuses, setDraftStatuses] = useState<Record<string, Status>>({})
   const [draftMessages, setDraftMessages] = useState<Record<string, string>>({})
   const [savingAppointmentId, setSavingAppointmentId] = useState("")
@@ -150,6 +161,183 @@ export default function DoctorAppointmentsPage() {
     () => appointments.filter((appointment) => appointment.status === "cancelled" || appointment.status === "no-show").length,
     [appointments]
   )
+
+  const activeAppointments = useMemo(
+    () =>
+      [...appointments]
+        .filter((appointment) => appointment.status === "confirmed" || appointment.status === "scheduled")
+        .sort((left, right) => getAppointmentTimestamp(left) - getAppointmentTimestamp(right)),
+    [appointments]
+  )
+
+  const pastOrCancelledAppointments = useMemo(
+    () =>
+      [...appointments]
+        .filter((appointment) => appointment.status !== "confirmed" && appointment.status !== "scheduled")
+        .sort((left, right) => getAppointmentTimestamp(right) - getAppointmentTimestamp(left)),
+    [appointments]
+  )
+
+  const renderAppointmentRow = (appointment: DoctorAppointmentRecord) => {
+    const patientName = appointment.patientDetails?.fullName || "Patient"
+    const patientRecord = appointment.patient && typeof appointment.patient !== "string" ? appointment.patient : null
+    const appointmentDate = appointment.appointment_date ? new Date(appointment.appointment_date) : null
+    const appointmentDateLabel =
+      appointmentDate && !Number.isNaN(appointmentDate.getTime())
+        ? appointmentDate.toLocaleString()
+        : "Date not available"
+    const isCancellationSelected = (draftStatuses[appointment.$id] || appointment.status) === "cancelled"
+    const messageValue = draftMessages[appointment.$id] || ""
+    const isExpanded = expandedAppointmentId === appointment.$id
+
+    return (
+      <div key={appointment.$id} className="rounded-xl border bg-white/90 p-4 dark:bg-slate-950/70">
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex items-center gap-3">
+              <Avatar size="sm" className="size-10">
+                <AvatarImage src={appointment.patientDetails?.avatarUrl || ""} alt={patientName} />
+                <AvatarFallback className="bg-blue-500 text-white">
+                  {getInitials(patientName)}
+                </AvatarFallback>
+              </Avatar>
+              <div className="min-w-0">
+                <p className="font-medium text-foreground">{patientName}</p>
+                <p className="text-sm text-muted-foreground">
+                  {appointment.patientDetails?.phone || "No phone on file"}
+                </p>
+              </div>
+            </div>
+            <span className={`w-fit rounded-full px-2.5 py-1 text-xs font-medium ${getStatusClass(appointment.status)}`}>
+              {getStatusLabel(appointment.status)}
+            </span>
+            <button
+              type="button"
+              onClick={() => setExpandedAppointmentId((current) => (current === appointment.$id ? "" : appointment.$id))}
+              className="inline-flex items-center justify-between rounded-lg border border-input bg-background px-3 py-2 text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-900 lg:w-56"
+            >
+              <span>{isExpanded ? "Hide details" : "View details"}</span>
+              {isExpanded ? <ChevronUp className="size-4" /> : <ChevronDown className="size-4" />}
+            </button>
+          </div>
+
+          {isExpanded ? (
+            <div className="grid gap-4 rounded-xl border bg-slate-50/80 p-4 dark:bg-slate-900/60 lg:grid-cols-[minmax(0,1fr)_16rem]">
+              <div className="space-y-4">
+                <div>
+                  <p className="font-medium text-foreground">{appointment.reason_for_visit}</p>
+                  <p className="mt-1 text-sm text-muted-foreground">{appointmentDateLabel}</p>
+                  {appointment.notes ? (
+                    <p className="mt-2 text-sm text-muted-foreground">{appointment.notes}</p>
+                  ) : null}
+                  {appointment.status === "cancelled" && appointment.cancellationReason ? (
+                    <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-200">
+                      Cancellation reason sent to patient: {appointment.cancellationReason}
+                    </div>
+                  ) : null}
+                </div>
+
+                <div className="grid gap-3 md:grid-cols-2">
+                  <div className="rounded-lg border bg-white/80 p-3 dark:bg-slate-950/60">
+                    <p className="text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">Phone</p>
+                    <p className="mt-1 text-sm text-foreground">{appointment.patientDetails?.phone || "No phone on file"}</p>
+                  </div>
+                  <div className="rounded-lg border bg-white/80 p-3 dark:bg-slate-950/60">
+                    <p className="text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">Email</p>
+                    <p className="mt-1 text-sm text-foreground">{patientRecord?.email || "No email on file"}</p>
+                  </div>
+                  <div className="rounded-lg border bg-white/80 p-3 dark:bg-slate-950/60">
+                    <p className="text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">Gender</p>
+                    <p className="mt-1 text-sm text-foreground">{patientRecord?.gender || "Not provided"}</p>
+                  </div>
+                  <div className="rounded-lg border bg-white/80 p-3 dark:bg-slate-950/60">
+                    <p className="text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">Occupation</p>
+                    <p className="mt-1 text-sm text-foreground">{patientRecord?.occupation || "Not provided"}</p>
+                  </div>
+                  <div className="rounded-lg border bg-white/80 p-3 dark:bg-slate-950/60 md:col-span-2">
+                    <p className="text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">Address</p>
+                    <p className="mt-1 text-sm text-foreground">{patientRecord?.address || "Not provided"}</p>
+                  </div>
+                  <div className="rounded-lg border bg-white/80 p-3 dark:bg-slate-950/60">
+                    <p className="text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">Emergency contact</p>
+                    <p className="mt-1 text-sm text-foreground">{patientRecord?.emergencyContactName || "Not provided"}</p>
+                  </div>
+                  <div className="rounded-lg border bg-white/80 p-3 dark:bg-slate-950/60">
+                    <p className="text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">Emergency number</p>
+                    <p className="mt-1 text-sm text-foreground">{patientRecord?.emergencyContactNumber || "Not provided"}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex w-full flex-col gap-3">
+                <select
+                  value={draftStatuses[appointment.$id] || appointment.status}
+                  onChange={(event) =>
+                    setDraftStatuses((current) => ({
+                      ...current,
+                      [appointment.$id]: event.target.value as Status,
+                    }))
+                  }
+                  className="flex h-10 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
+                >
+                  {appointmentStatusOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+                <Textarea
+                  value={messageValue}
+                  onChange={(event) =>
+                    setDraftMessages((current) => ({
+                      ...current,
+                      [appointment.$id]: event.target.value,
+                    }))
+                  }
+                  placeholder={
+                    isCancellationSelected
+                      ? "Cancellation reason for the patient"
+                      : "Message the patient about this appointment"
+                  }
+                  className="min-h-24"
+                />
+                {isCancellationSelected ? (
+                  <p className="text-xs text-muted-foreground">
+                    Doctors must provide a cancellation reason of at least 10 characters.
+                  </p>
+                ) : (
+                  <p className="text-xs text-muted-foreground">
+                    Send a direct appointment message to this patient from your portal.
+                  </p>
+                )}
+                <Button
+                  type="button"
+                  onClick={() => void handleStatusSave(appointment.$id)}
+                  disabled={
+                    savingAppointmentId === appointment.$id ||
+                    draftStatuses[appointment.$id] === appointment.status ||
+                    (isCancellationSelected && messageValue.trim().length < 10)
+                  }
+                >
+                  {savingAppointmentId === appointment.$id ? <Spinner className="mr-2 size-4" /> : null}
+                  Update status
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => void handleSendPatientMessage(appointment.$id)}
+                  disabled={messagingAppointmentId === appointment.$id || messageValue.trim().length < 5}
+                >
+                  {messagingAppointmentId === appointment.$id ? <Spinner className="mr-2 size-4" /> : null}
+                  Message patient
+                </Button>
+              </div>
+            </div>
+          ) : null}
+        </div>
+      </div>
+    )
+  }
 
   const handleStatusSave = async (appointmentId: string) => {
     const nextStatus = draftStatuses[appointmentId]
@@ -304,122 +492,35 @@ export default function DoctorAppointmentsPage() {
                 <Spinner className="mr-2 size-4" />
                 Loading appointments...
               </div>
-            ) : appointments.length === 0 ? (
+            ) : activeAppointments.length === 0 ? (
               <div className="rounded-lg border border-dashed border-indigo-200 bg-white/80 px-4 py-10 text-center text-sm text-muted-foreground dark:border-indigo-900/60 dark:bg-slate-950/60">
-                No appointments are scheduled for this doctor yet.
+                No active upcoming visits are scheduled for this doctor yet.
               </div>
             ) : (
-              appointments.map((appointment) => {
-                const patientName = appointment.patientDetails?.fullName || "Patient"
-                const appointmentDate = appointment.appointment_date ? new Date(appointment.appointment_date) : null
-                const appointmentDateLabel =
-                  appointmentDate && !Number.isNaN(appointmentDate.getTime())
-                    ? appointmentDate.toLocaleString()
-                    : "Date not available"
-                const isCancellationSelected = (draftStatuses[appointment.$id] || appointment.status) === "cancelled"
-                const messageValue = draftMessages[appointment.$id] || ""
+              activeAppointments.map((appointment) => renderAppointmentRow(appointment))
+            )}
+          </CardContent>
+        </Card>
 
-                return (
-                  <div key={appointment.$id} className="rounded-xl border bg-white/90 p-4 dark:bg-slate-950/70">
-                    <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-3">
-                          <Avatar size="sm" className="size-10">
-                            <AvatarImage src={appointment.patientDetails?.avatarUrl || ""} alt={patientName} />
-                            <AvatarFallback className="bg-blue-500 text-white">
-                              {getInitials(patientName)}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div>
-                            <p className="font-medium text-foreground">{patientName}</p>
-                            <p className="text-sm text-muted-foreground">
-                              {appointment.patientDetails?.phone || "No phone on file"}
-                            </p>
-                          </div>
-                        </div>
-
-                        <p className="mt-4 font-medium text-foreground">{appointment.reason_for_visit}</p>
-                        <p className="mt-1 text-sm text-muted-foreground">{appointmentDateLabel}</p>
-                        {appointment.notes ? (
-                          <p className="mt-2 text-sm text-muted-foreground">{appointment.notes}</p>
-                        ) : null}
-                        {appointment.status === "cancelled" && appointment.cancellationReason ? (
-                          <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-200">
-                            Cancellation reason sent to patient: {appointment.cancellationReason}
-                          </div>
-                        ) : null}
-                      </div>
-
-                      <div className="flex w-full flex-col gap-3 lg:w-64">
-                        <span className={`w-fit rounded-full px-2.5 py-1 text-xs font-medium ${getStatusClass(appointment.status)}`}>
-                          {getStatusLabel(appointment.status)}
-                        </span>
-                        <select
-                          value={draftStatuses[appointment.$id] || appointment.status}
-                          onChange={(event) =>
-                            setDraftStatuses((current) => ({
-                              ...current,
-                              [appointment.$id]: event.target.value as Status,
-                            }))
-                          }
-                          className="flex h-10 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
-                        >
-                          {appointmentStatusOptions.map((option) => (
-                            <option key={option.value} value={option.value}>
-                              {option.label}
-                            </option>
-                          ))}
-                        </select>
-                        <Textarea
-                          value={messageValue}
-                          onChange={(event) =>
-                            setDraftMessages((current) => ({
-                              ...current,
-                              [appointment.$id]: event.target.value,
-                            }))
-                          }
-                          placeholder={
-                            isCancellationSelected
-                              ? "Cancellation reason for the patient"
-                              : "Message the patient about this appointment"
-                          }
-                          className="min-h-24"
-                        />
-                        {isCancellationSelected ? (
-                          <p className="text-xs text-muted-foreground">
-                            Doctors must provide a cancellation reason of at least 10 characters.
-                          </p>
-                        ) : (
-                          <p className="text-xs text-muted-foreground">
-                            Send a direct appointment message to this patient from your portal.
-                          </p>
-                        )}
-                        <Button
-                          type="button"
-                          onClick={() => void handleStatusSave(appointment.$id)}
-                          disabled={
-                            savingAppointmentId === appointment.$id ||
-                            draftStatuses[appointment.$id] === appointment.status ||
-                            (isCancellationSelected && messageValue.trim().length < 10)
-                          }
-                        >
-                          {savingAppointmentId === appointment.$id ? <Spinner className="mr-2 size-4" /> : null}
-                          Update status
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={() => void handleSendPatientMessage(appointment.$id)}
-                          disabled={messagingAppointmentId === appointment.$id || messageValue.trim().length < 5}
-                        >
-                          {messagingAppointmentId === appointment.$id ? <Spinner className="mr-2 size-4" /> : null}
-                          Message patient
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                )
-              })
+        <Card className="mt-6 bg-slate-100/90 dark:bg-slate-900/80">
+          <CardHeader>
+            <CardTitle>Past/Cancelled Visits</CardTitle>
+            <CardDescription>
+              Review completed, missed, and cancelled appointments separately from active visits.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {isLoading ? (
+              <div className="flex items-center justify-center rounded-lg border border-dashed px-4 py-10 text-sm text-muted-foreground">
+                <Spinner className="mr-2 size-4" />
+                Loading visit history...
+              </div>
+            ) : pastOrCancelledAppointments.length === 0 ? (
+              <div className="rounded-lg border border-dashed px-4 py-10 text-center text-sm text-muted-foreground">
+                No past or cancelled visits are available yet.
+              </div>
+            ) : (
+              pastOrCancelledAppointments.map((appointment) => renderAppointmentRow(appointment))
             )}
           </CardContent>
         </Card>

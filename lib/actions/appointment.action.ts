@@ -21,6 +21,43 @@ function normalizeMessage(value?: string) {
   return value?.trim() || ""
 }
 
+const CANCELLATION_REASON_MARKER = "[[CANCELLATION_REASON]]"
+
+function splitAppointmentNotes(rawNotes: unknown) {
+  const normalizedNotes = typeof rawNotes === "string" ? rawNotes : ""
+  const markerIndex = normalizedNotes.lastIndexOf(CANCELLATION_REASON_MARKER)
+
+  if (markerIndex === -1) {
+    return {
+      notes: normalizedNotes,
+      cancellationReason: null as string | null,
+    }
+  }
+
+  const notes = normalizedNotes.slice(0, markerIndex).trimEnd()
+  const cancellationReason = normalizedNotes
+    .slice(markerIndex + CANCELLATION_REASON_MARKER.length)
+    .trim()
+
+  return {
+    notes,
+    cancellationReason: cancellationReason || null,
+  }
+}
+
+function buildAppointmentNotes(notes: string, cancellationReason?: string) {
+  const normalizedNotes = normalizeMessage(notes)
+  const normalizedCancellationReason = normalizeMessage(cancellationReason)
+
+  if (!normalizedCancellationReason) {
+    return normalizedNotes
+  }
+
+  return normalizedNotes
+    ? `${normalizedNotes}\n\n${CANCELLATION_REASON_MARKER} ${normalizedCancellationReason}`
+    : `${CANCELLATION_REASON_MARKER} ${normalizedCancellationReason}`
+}
+
 function getAppointmentStatusLabel(status: Status) {
   if (status === "no-show") {
     return "No-show"
@@ -136,6 +173,14 @@ function serializeAppointment<T extends Record<string, any>>(appointment: T | nu
     return null
   }
 
+  const resolvedNotesSource =
+    typeof appointment.notes === "string"
+      ? appointment.notes
+      : typeof appointment.note === "string"
+        ? appointment.note
+        : ""
+  const { notes: visibleNotes, cancellationReason } = splitAppointmentNotes(resolvedNotesSource)
+
   return parseStringify({
     ...appointment,
     appointment_date:
@@ -155,15 +200,8 @@ function serializeAppointment<T extends Record<string, any>>(appointment: T | nu
         ? appointment.reason_for_visit
         : appointment.reason || "",
     notes:
-      typeof appointment.notes === "string"
-        ? appointment.notes
-        : typeof appointment.note === "string"
-          ? appointment.note
-          : "",
-    cancellationReason:
-      typeof appointment.cancellationReason === "string" && appointment.cancellationReason.trim().length > 0
-        ? appointment.cancellationReason.trim()
-        : null,
+      visibleNotes,
+    cancellationReason,
     booking_channel:
       appointment.booking_channel === "mobile" ||
       appointment.booking_channel === "phone"
@@ -366,6 +404,13 @@ export const updateAppointmentStatus = async ({
   let actingDoctorName = ""
   const patientId = typeof appointment.patient === "string" ? appointment.patient : appointment.patient?.$id
   const patient = patientId ? await getPatientById(patientId) : null
+  const existingNotesValue =
+    typeof appointment.notes === "string"
+      ? appointment.notes
+      : typeof appointment.note === "string"
+        ? appointment.note
+        : ""
+  const { notes: existingVisibleNotes } = splitAppointmentNotes(existingNotesValue)
 
   if (actorRole === "doctor") {
     if (!actorDoctorUserId) {
@@ -397,7 +442,10 @@ export const updateAppointmentStatus = async ({
     rowId: appointmentId,
     data: {
       status,
-      cancellationReason: status === "cancelled" ? normalizedCancellationReason : null,
+      notes:
+        status === "cancelled"
+          ? buildAppointmentNotes(existingVisibleNotes, normalizedCancellationReason)
+          : buildAppointmentNotes(existingVisibleNotes),
     },
   })
 
