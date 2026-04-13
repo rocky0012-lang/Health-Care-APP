@@ -16,6 +16,8 @@ declare type PatientNotificationKind = "status" | "admin-message" | "emergency-m
 declare type DoctorScheduleDayKey = "monday" | "tuesday" | "wednesday" | "thursday" | "friday";
 declare type PaymentMethodKind = "card" | "mobile" | "bank";
 declare type PaymentCardBrand = "visa" | "mastercard" | "amex" | "discover" | "verve" | "unknown";
+declare type PatientDiagnosisStatus = "active" | "resolved" | "chronic";
+declare type PatientPrescriptionStatus = "active" | "completed" | "stopped";
 
 declare interface DoctorWeeklyScheduleDay {
   enabled: boolean;

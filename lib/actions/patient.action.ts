@@ -1,9 +1,22 @@
 "use server"
 
-import { BUCKET_ID, DATABASE_ID, PATIENT_TABLE_ID, storage, tablesDB, users } from "../appwrite.config"
+import {
+    BUCKET_ID,
+    DATABASE_ID,
+    PATIENT_DIAGNOSIS_TABLE_ID,
+    PATIENT_PRESCRIPTION_TABLE_ID,
+    PATIENT_TABLE_ID,
+    PATIENT_VITALS_TABLE_ID,
+    storage,
+    tablesDB,
+    users,
+} from "../appwrite.config"
 import { ID, Permission, Query, Role } from "node-appwrite"
 import { InputFile } from "node-appwrite/file"
 import { parseStringify } from "../utils"
+import type { PatientDiagnosis, PatientPrescription, PatientVital } from "../../types/appwrite.types"
+import { getDoctorById } from "./doctor.action"
+import { sendPatientAccountCreatedEmail } from "./email-notification.action"
 
 const PUBLIC_AVATAR_PERMISSIONS = [Permission.read(Role.any())]
 const DEFAULT_PATIENT_ACCOUNT_STATUS: PatientAccountStatus = "active"
@@ -224,6 +237,147 @@ function assertPatientStatusMessage(status: PatientAccountStatus, message?: stri
     }
 }
 
+function normalizeOptionalString(value?: string) {
+    const trimmedValue = value?.trim()
+    return trimmedValue ? trimmedValue : undefined
+}
+
+function normalizeOptionalNumber(value?: number | string) {
+    if (typeof value === "number") {
+        return Number.isFinite(value) ? value : undefined
+    }
+
+    if (typeof value === "string") {
+        const trimmedValue = value.trim()
+        if (!trimmedValue) {
+            return undefined
+        }
+
+        const parsedValue = Number(trimmedValue)
+        return Number.isFinite(parsedValue) ? parsedValue : undefined
+    }
+
+    return undefined
+}
+
+function normalizeIsoDateString(value?: string) {
+    if (!value) {
+        return new Date().toISOString()
+    }
+
+    const parsedDate = new Date(value)
+    if (Number.isNaN(parsedDate.getTime())) {
+        throw new Error("Invalid clinical record date.")
+    }
+
+    return parsedDate.toISOString()
+}
+
+function assertClinicalTableConfig(tableId?: string, label?: string) {
+    if (!DATABASE_ID || !tableId) {
+        throw new Error(`Missing DATABASE_ID or ${label || "clinical table"} in environment`)
+    }
+}
+
+function normalizePatientDiagnosisStatus(value?: string): PatientDiagnosisStatus {
+    if (value === "resolved" || value === "chronic") {
+        return value
+    }
+
+    return "active"
+}
+
+function normalizePatientPrescriptionStatus(value?: string): PatientPrescriptionStatus {
+    if (value === "completed" || value === "stopped") {
+        return value
+    }
+
+    return "active"
+}
+
+function serializePatientVital<T extends Record<string, any>>(vital: T | null): PatientVital | null {
+    if (!vital) {
+        return null
+    }
+
+    return parseStringify({
+        ...vital,
+        bloodPressureSystolic:
+            typeof vital.bloodPressureSystolic === "number" ? vital.bloodPressureSystolic : undefined,
+        bloodPressureDiastolic:
+            typeof vital.bloodPressureDiastolic === "number" ? vital.bloodPressureDiastolic : undefined,
+        heartRate: typeof vital.heartRate === "number" ? vital.heartRate : undefined,
+        respiratoryRate: typeof vital.respiratoryRate === "number" ? vital.respiratoryRate : undefined,
+        oxygenSaturation: typeof vital.oxygenSaturation === "number" ? vital.oxygenSaturation : undefined,
+        temperatureCelsius:
+            typeof vital.temperatureCelsius === "number" ? vital.temperatureCelsius : undefined,
+        weightKg: typeof vital.weightKg === "number" ? vital.weightKg : undefined,
+        heightCm: typeof vital.heightCm === "number" ? vital.heightCm : undefined,
+        notes: typeof vital.notes === "string" ? vital.notes : undefined,
+    }) as unknown as PatientVital
+}
+
+function serializePatientDiagnosis<T extends Record<string, any>>(diagnosis: T | null): PatientDiagnosis | null {
+    if (!diagnosis) {
+        return null
+    }
+
+    return parseStringify({
+        ...diagnosis,
+        status: normalizePatientDiagnosisStatus(typeof diagnosis.status === "string" ? diagnosis.status : undefined),
+        notes: typeof diagnosis.notes === "string" ? diagnosis.notes : undefined,
+    }) as unknown as PatientDiagnosis
+}
+
+function serializePatientPrescription<T extends Record<string, any>>(prescription: T | null): PatientPrescription | null {
+    if (!prescription) {
+        return null
+    }
+
+    return parseStringify({
+        ...prescription,
+        status: normalizePatientPrescriptionStatus(typeof prescription.status === "string" ? prescription.status : undefined),
+        instructions: typeof prescription.instructions === "string" ? prescription.instructions : undefined,
+        duration: typeof prescription.duration === "string" ? prescription.duration : undefined,
+    }) as unknown as PatientPrescription
+}
+
+async function withClinicalDoctorDetails<T extends Record<string, any>>(record: T | null) {
+    if (!record) {
+        return null
+    }
+
+    const doctorId = typeof record.doctorId === "string" ? record.doctorId.trim() : ""
+    if (!doctorId) {
+        return {
+            ...record,
+            doctorDetails: null,
+        }
+    }
+
+    try {
+        const doctor = await getDoctorById(doctorId)
+
+        return {
+            ...record,
+            doctorDetails: doctor
+                ? {
+                    id: doctor.$id,
+                    fullName: doctor.name || doctor.fullName,
+                    avatarUrl: doctor.avatarUrl || "",
+                    specialty: doctor.specialization || doctor.specialty || "",
+                }
+                : null,
+        }
+    } catch (error) {
+        console.error("withClinicalDoctorDetails error:", error)
+        return {
+            ...record,
+            doctorDetails: null,
+        }
+    }
+}
+
 function buildBucketFileUrl(fileId?: string) {
     if (!fileId || !BUCKET_ID || !process.env.NEXT_PUBLIC_ENDPOINT || !process.env.PROJECT_ID) {
         return ""
@@ -255,16 +409,38 @@ async function uploadBucketFile(file: File, permissions?: string[]) {
     return uploaded.$id
 }
 
-async function ensureAvatarFileIsReadable(fileId?: string) {
+async function ensureStoredPatientFileIsReadable(fileId?: string, label = "patient file") {
     if (!BUCKET_ID || !fileId) {
-        return
+        return false
     }
 
-    await storage.updateFile({
-        bucketId: BUCKET_ID,
-        fileId,
-        permissions: PUBLIC_AVATAR_PERMISSIONS,
-    })
+    try {
+        await storage.updateFile({
+            bucketId: BUCKET_ID,
+            fileId,
+            permissions: PUBLIC_AVATAR_PERMISSIONS,
+        })
+
+        return true
+    } catch (error) {
+        const appwriteError = error as {
+            code?: number
+            message?: string
+            type?: string
+        }
+
+        const isMissingFile =
+            appwriteError?.code === 404 ||
+            appwriteError?.type === "storage_file_not_found" ||
+            appwriteError?.message?.toLowerCase().includes("requested file could not be found")
+
+        if (isMissingFile) {
+            console.warn(`${label} is missing. Falling back to no file.`, { fileId })
+            return false
+        }
+
+        throw error
+    }
 }
 
 function serializePatient<T extends Record<string, any>>(patient: T | null): (T & {
@@ -399,22 +575,69 @@ export const createUser = async (user: CreateUserParams) => {
           name: user.name,
         }
     )
+
+    try {
+        await sendPatientAccountCreatedEmail({
+            userId: newUser.$id,
+            name: user.name,
+        })
+    } catch (notificationError) {
+        console.error("Patient account email notification failed:", notificationError)
+    }
+
     console.log("User created successfully:", newUser)
     return parseStringify(newUser)
  } catch (error: any) {
     if (error?.code === 409) {
-        const existingUser = await users.list({
-          queries: [Query.equal("email", [user.email])],
-        })
-
-        const found = existingUser?.users?.[0]
-        if (!found) throw new Error("User already exists but could not be retrieved.")
-        return parseStringify(found)
+        throw new Error("An account with this email already exists. Please log in instead.")
     }
 
     console.error("createUser error:", error)
     throw error
  }
+}
+
+export const getPatientLoginRecord = async ({
+    email,
+    phone,
+}: {
+    email: string
+    phone?: string
+}) => {
+    const normalizedEmail = email.trim().toLowerCase()
+    const normalizedPhone = phone?.trim()
+
+    if (!normalizedEmail) {
+        return null
+    }
+
+    try {
+        const existingUsers = await users.list({
+            queries: [Query.equal("email", [normalizedEmail]), Query.limit(1)],
+        })
+
+        const user = existingUsers?.users?.[0]
+        if (!user) {
+            return null
+        }
+
+        if (normalizedPhone && user.phone && user.phone !== normalizedPhone) {
+            return null
+        }
+
+        const patient = await getPatientByUserId(user.$id)
+
+        return parseStringify({
+            userId: user.$id,
+            email: user.email,
+            phone: user.phone || "",
+            name: patient?.name || user.name || "Patient",
+            hasProfile: Boolean(patient),
+        })
+    } catch (error) {
+        console.error("getPatientLoginRecord error:", error)
+        throw error
+    }
 }
 
 export const registerPatient = async (formData: FormData) => {
@@ -537,7 +760,21 @@ export const getPatientByUserId = async (userId: string) => {
         }
 
         if (patient.avatarId) {
-            await ensureAvatarFileIsReadable(patient.avatarId)
+            const hasReadableAvatar = await ensureStoredPatientFileIsReadable(patient.avatarId, "Patient avatar file")
+            if (!hasReadableAvatar) {
+                patient.avatarId = undefined
+            }
+        }
+
+        if (patient.identificationDocumentId) {
+            const hasReadableIdentificationDocument = await ensureStoredPatientFileIsReadable(
+                patient.identificationDocumentId,
+                "Patient identification document"
+            )
+
+            if (!hasReadableIdentificationDocument) {
+                patient.identificationDocumentId = undefined
+            }
         }
 
         return serializePatient(await withPatientStatus(patient))
@@ -568,7 +805,21 @@ export const getPatientById = async (patientId: string) => {
         }
 
         if (patient.avatarId) {
-            await ensureAvatarFileIsReadable(patient.avatarId)
+            const hasReadableAvatar = await ensureStoredPatientFileIsReadable(patient.avatarId, "Patient avatar file")
+            if (!hasReadableAvatar) {
+                patient.avatarId = undefined
+            }
+        }
+
+        if (patient.identificationDocumentId) {
+            const hasReadableIdentificationDocument = await ensureStoredPatientFileIsReadable(
+                patient.identificationDocumentId,
+                "Patient identification document"
+            )
+
+            if (!hasReadableIdentificationDocument) {
+                patient.identificationDocumentId = undefined
+            }
         }
 
         return serializePatient(await withPatientStatus(patient))
@@ -690,6 +941,569 @@ export const listPatients = async (limit = 200) => {
         console.error("listPatients error:", error)
         throw error
     }
+}
+
+export const listPatientVitals = async (patientUserId: string, limit = 20) => {
+    try {
+        if (!DATABASE_ID || !PATIENT_VITALS_TABLE_ID || !patientUserId) {
+            return []
+        }
+
+        const response = await tablesDB.listRows({
+            databaseId: DATABASE_ID,
+            tableId: PATIENT_VITALS_TABLE_ID,
+            queries: [Query.equal("patientUserId", [patientUserId]), Query.orderDesc("recordedAt"), Query.limit(limit)],
+        })
+
+        const vitalsWithDoctorDetails = await Promise.all(response.rows.map((vital) => withClinicalDoctorDetails(vital)))
+
+        return vitalsWithDoctorDetails
+            .map((vital) => serializePatientVital(vital))
+            .filter((vital): vital is NonNullable<typeof vital> => Boolean(vital))
+    } catch (error) {
+        console.error("listPatientVitals error:", error)
+        return []
+    }
+}
+
+export const listAppointmentVitals = async (appointmentId: string, limit = 20) => {
+    try {
+        if (!DATABASE_ID || !PATIENT_VITALS_TABLE_ID || !appointmentId) {
+            return []
+        }
+
+        const response = await tablesDB.listRows({
+            databaseId: DATABASE_ID,
+            tableId: PATIENT_VITALS_TABLE_ID,
+            queries: [Query.equal("appointmentId", [appointmentId]), Query.orderDesc("recordedAt"), Query.limit(limit)],
+        })
+
+        const vitalsWithDoctorDetails = await Promise.all(response.rows.map((vital) => withClinicalDoctorDetails(vital)))
+
+        return vitalsWithDoctorDetails
+            .map((vital) => serializePatientVital(vital))
+            .filter((vital): vital is NonNullable<typeof vital> => Boolean(vital))
+    } catch (error) {
+        console.error("listAppointmentVitals error:", error)
+        return []
+    }
+}
+
+export const listPatientDiagnoses = async (patientUserId: string, limit = 20) => {
+    try {
+        if (!DATABASE_ID || !PATIENT_DIAGNOSIS_TABLE_ID || !patientUserId) {
+            return []
+        }
+
+        const response = await tablesDB.listRows({
+            databaseId: DATABASE_ID,
+            tableId: PATIENT_DIAGNOSIS_TABLE_ID,
+            queries: [Query.equal("patientUserId", [patientUserId]), Query.orderDesc("diagnosedAt"), Query.limit(limit)],
+        })
+
+        const diagnosesWithDoctorDetails = await Promise.all(response.rows.map((diagnosis) => withClinicalDoctorDetails(diagnosis)))
+
+        return diagnosesWithDoctorDetails
+            .map((diagnosis) => serializePatientDiagnosis(diagnosis))
+            .filter((diagnosis): diagnosis is NonNullable<typeof diagnosis> => Boolean(diagnosis))
+    } catch (error) {
+        console.error("listPatientDiagnoses error:", error)
+        return []
+    }
+}
+
+export const listAppointmentDiagnoses = async (appointmentId: string, limit = 20) => {
+    try {
+        if (!DATABASE_ID || !PATIENT_DIAGNOSIS_TABLE_ID || !appointmentId) {
+            return []
+        }
+
+        const response = await tablesDB.listRows({
+            databaseId: DATABASE_ID,
+            tableId: PATIENT_DIAGNOSIS_TABLE_ID,
+            queries: [Query.equal("appointmentId", [appointmentId]), Query.orderDesc("diagnosedAt"), Query.limit(limit)],
+        })
+
+        const diagnosesWithDoctorDetails = await Promise.all(response.rows.map((diagnosis) => withClinicalDoctorDetails(diagnosis)))
+
+        return diagnosesWithDoctorDetails
+            .map((diagnosis) => serializePatientDiagnosis(diagnosis))
+            .filter((diagnosis): diagnosis is NonNullable<typeof diagnosis> => Boolean(diagnosis))
+    } catch (error) {
+        console.error("listAppointmentDiagnoses error:", error)
+        return []
+    }
+}
+
+export const listPatientPrescriptions = async (patientUserId: string, limit = 20) => {
+    try {
+        if (!DATABASE_ID || !PATIENT_PRESCRIPTION_TABLE_ID || !patientUserId) {
+            return []
+        }
+
+        const response = await tablesDB.listRows({
+            databaseId: DATABASE_ID,
+            tableId: PATIENT_PRESCRIPTION_TABLE_ID,
+            queries: [Query.equal("patientUserId", [patientUserId]), Query.orderDesc("prescribedAt"), Query.limit(limit)],
+        })
+
+        const prescriptionsWithDoctorDetails = await Promise.all(response.rows.map((prescription) => withClinicalDoctorDetails(prescription)))
+
+        return prescriptionsWithDoctorDetails
+            .map((prescription) => serializePatientPrescription(prescription))
+            .filter((prescription): prescription is NonNullable<typeof prescription> => Boolean(prescription))
+    } catch (error) {
+        console.error("listPatientPrescriptions error:", error)
+        return []
+    }
+}
+
+export const listAppointmentPrescriptions = async (appointmentId: string, limit = 20) => {
+    try {
+        if (!DATABASE_ID || !PATIENT_PRESCRIPTION_TABLE_ID || !appointmentId) {
+            return []
+        }
+
+        const response = await tablesDB.listRows({
+            databaseId: DATABASE_ID,
+            tableId: PATIENT_PRESCRIPTION_TABLE_ID,
+            queries: [Query.equal("appointmentId", [appointmentId]), Query.orderDesc("prescribedAt"), Query.limit(limit)],
+        })
+
+        const prescriptionsWithDoctorDetails = await Promise.all(response.rows.map((prescription) => withClinicalDoctorDetails(prescription)))
+
+        return prescriptionsWithDoctorDetails
+            .map((prescription) => serializePatientPrescription(prescription))
+            .filter((prescription): prescription is NonNullable<typeof prescription> => Boolean(prescription))
+    } catch (error) {
+        console.error("listAppointmentPrescriptions error:", error)
+        return []
+    }
+}
+
+export const createPatientVital = async ({
+    patientId,
+    patientUserId,
+    appointmentId,
+    doctorId,
+    bloodPressureSystolic,
+    bloodPressureDiastolic,
+    heartRate,
+    respiratoryRate,
+    oxygenSaturation,
+    notes,
+    recordedAt,
+    temperatureCelsius,
+    weightKg,
+    heightCm,
+}: {
+    patientId: string
+    patientUserId: string
+    appointmentId?: string
+    doctorId?: string
+    bloodPressureSystolic?: number | string
+    bloodPressureDiastolic?: number | string
+    heartRate?: number | string
+    respiratoryRate?: number | string
+    oxygenSaturation?: number | string
+    notes?: string
+    recordedAt?: string
+    temperatureCelsius?: number | string
+    weightKg?: number | string
+    heightCm?: number | string
+}) => {
+    assertClinicalTableConfig(PATIENT_VITALS_TABLE_ID, "PATIENT_VITALS_TABLE_ID")
+
+    const normalizedPatientId = patientId.trim()
+    const normalizedPatientUserId = patientUserId.trim()
+
+    if (!normalizedPatientId || !normalizedPatientUserId) {
+        throw new Error("Missing patient context for vitals entry.")
+    }
+
+    const record = await tablesDB.createRow({
+        databaseId: DATABASE_ID!,
+        tableId: PATIENT_VITALS_TABLE_ID!,
+        rowId: ID.unique(),
+        data: {
+            patientId: normalizedPatientId,
+            patientUserId: normalizedPatientUserId,
+            appointmentId: normalizeOptionalString(appointmentId),
+            doctorId: normalizeOptionalString(doctorId),
+            bloodPressureSystolic: normalizeOptionalNumber(bloodPressureSystolic),
+            bloodPressureDiastolic: normalizeOptionalNumber(bloodPressureDiastolic),
+            heartRate: normalizeOptionalNumber(heartRate),
+            respiratoryRate: normalizeOptionalNumber(respiratoryRate),
+            oxygenSaturation: normalizeOptionalNumber(oxygenSaturation),
+            notes: normalizeOptionalString(notes),
+            recordedAt: normalizeIsoDateString(recordedAt),
+            temperatureCelsius: normalizeOptionalNumber(temperatureCelsius),
+            weightKg: normalizeOptionalNumber(weightKg),
+            heightCm: normalizeOptionalNumber(heightCm),
+        },
+    })
+
+    return serializePatientVital(await withClinicalDoctorDetails(record))
+}
+
+export const updatePatientVital = async ({
+    vitalId,
+    doctorId,
+    bloodPressureSystolic,
+    bloodPressureDiastolic,
+    heartRate,
+    respiratoryRate,
+    oxygenSaturation,
+    notes,
+    recordedAt,
+    temperatureCelsius,
+    weightKg,
+    heightCm,
+}: {
+    vitalId: string
+    doctorId?: string
+    bloodPressureSystolic?: number | string
+    bloodPressureDiastolic?: number | string
+    heartRate?: number | string
+    respiratoryRate?: number | string
+    oxygenSaturation?: number | string
+    notes?: string
+    recordedAt?: string
+    temperatureCelsius?: number | string
+    weightKg?: number | string
+    heightCm?: number | string
+}) => {
+    assertClinicalTableConfig(PATIENT_VITALS_TABLE_ID, "PATIENT_VITALS_TABLE_ID")
+
+    if (!vitalId.trim()) {
+        throw new Error("Missing vitals record id.")
+    }
+
+    const existingRecord = await tablesDB.getRow({
+        databaseId: DATABASE_ID!,
+        tableId: PATIENT_VITALS_TABLE_ID!,
+        rowId: vitalId,
+    })
+
+    if (doctorId && existingRecord.doctorId && existingRecord.doctorId !== doctorId.trim()) {
+        throw new Error("You cannot edit vitals recorded by another doctor.")
+    }
+
+    const updatedRecord = await tablesDB.updateRow({
+        databaseId: DATABASE_ID!,
+        tableId: PATIENT_VITALS_TABLE_ID!,
+        rowId: vitalId,
+        data: {
+            bloodPressureSystolic: normalizeOptionalNumber(bloodPressureSystolic),
+            bloodPressureDiastolic: normalizeOptionalNumber(bloodPressureDiastolic),
+            heartRate: normalizeOptionalNumber(heartRate),
+            respiratoryRate: normalizeOptionalNumber(respiratoryRate),
+            oxygenSaturation: normalizeOptionalNumber(oxygenSaturation),
+            notes: normalizeOptionalString(notes),
+            recordedAt: normalizeIsoDateString(recordedAt || existingRecord.recordedAt),
+            temperatureCelsius: normalizeOptionalNumber(temperatureCelsius),
+            weightKg: normalizeOptionalNumber(weightKg),
+            heightCm: normalizeOptionalNumber(heightCm),
+        },
+    })
+
+    return serializePatientVital(await withClinicalDoctorDetails(updatedRecord))
+}
+
+export const deletePatientVital = async ({ vitalId, doctorId }: { vitalId: string; doctorId?: string }) => {
+    assertClinicalTableConfig(PATIENT_VITALS_TABLE_ID, "PATIENT_VITALS_TABLE_ID")
+
+    if (!vitalId.trim()) {
+        throw new Error("Missing vitals record id.")
+    }
+
+    const existingRecord = await tablesDB.getRow({
+        databaseId: DATABASE_ID!,
+        tableId: PATIENT_VITALS_TABLE_ID!,
+        rowId: vitalId,
+    })
+
+    if (doctorId && existingRecord.doctorId && existingRecord.doctorId !== doctorId.trim()) {
+        throw new Error("You cannot delete vitals recorded by another doctor.")
+    }
+
+    await tablesDB.deleteRow({
+        databaseId: DATABASE_ID!,
+        tableId: PATIENT_VITALS_TABLE_ID!,
+        rowId: vitalId,
+    })
+
+    return { success: true }
+}
+
+export const createPatientDiagnosis = async ({
+    patientId,
+    patientUserId,
+    doctorId,
+    diagnosisName,
+    status,
+    diagnosedAt,
+    appointmentId,
+    notes,
+}: {
+    patientId: string
+    patientUserId: string
+    doctorId: string
+    diagnosisName: string
+    status: PatientDiagnosisStatus
+    diagnosedAt?: string
+    appointmentId?: string
+    notes?: string
+}) => {
+    assertClinicalTableConfig(PATIENT_DIAGNOSIS_TABLE_ID, "PATIENT_DIAGNOSIS_TABLE_ID")
+
+    const normalizedPatientId = patientId.trim()
+    const normalizedPatientUserId = patientUserId.trim()
+    const normalizedDoctorId = doctorId.trim()
+    const normalizedDiagnosisName = diagnosisName.trim()
+
+    if (!normalizedPatientId || !normalizedPatientUserId || !normalizedDoctorId || !normalizedDiagnosisName) {
+        throw new Error("Missing required diagnosis details.")
+    }
+
+    const record = await tablesDB.createRow({
+        databaseId: DATABASE_ID!,
+        tableId: PATIENT_DIAGNOSIS_TABLE_ID!,
+        rowId: ID.unique(),
+        data: {
+            patientId: normalizedPatientId,
+            patientUserId: normalizedPatientUserId,
+            doctorId: normalizedDoctorId,
+            diagnosisName: normalizedDiagnosisName,
+            status: normalizePatientDiagnosisStatus(status),
+            diagnosedAt: normalizeIsoDateString(diagnosedAt),
+            appointmentId: normalizeOptionalString(appointmentId),
+            notes: normalizeOptionalString(notes),
+        },
+    })
+
+    return serializePatientDiagnosis(await withClinicalDoctorDetails(record))
+}
+
+export const updatePatientDiagnosis = async ({
+    diagnosisId,
+    doctorId,
+    diagnosisName,
+    status,
+    diagnosedAt,
+    notes,
+}: {
+    diagnosisId: string
+    doctorId?: string
+    diagnosisName: string
+    status: PatientDiagnosisStatus
+    diagnosedAt?: string
+    notes?: string
+}) => {
+    assertClinicalTableConfig(PATIENT_DIAGNOSIS_TABLE_ID, "PATIENT_DIAGNOSIS_TABLE_ID")
+
+    const normalizedDiagnosisId = diagnosisId.trim()
+    const normalizedDiagnosisName = diagnosisName.trim()
+
+    if (!normalizedDiagnosisId || !normalizedDiagnosisName) {
+        throw new Error("Missing diagnosis details.")
+    }
+
+    const existingRecord = await tablesDB.getRow({
+        databaseId: DATABASE_ID!,
+        tableId: PATIENT_DIAGNOSIS_TABLE_ID!,
+        rowId: normalizedDiagnosisId,
+    })
+
+    if (doctorId && existingRecord.doctorId && existingRecord.doctorId !== doctorId.trim()) {
+        throw new Error("You cannot edit diagnoses recorded by another doctor.")
+    }
+
+    const updatedRecord = await tablesDB.updateRow({
+        databaseId: DATABASE_ID!,
+        tableId: PATIENT_DIAGNOSIS_TABLE_ID!,
+        rowId: normalizedDiagnosisId,
+        data: {
+            diagnosisName: normalizedDiagnosisName,
+            status: normalizePatientDiagnosisStatus(status),
+            diagnosedAt: normalizeIsoDateString(diagnosedAt || existingRecord.diagnosedAt),
+            notes: normalizeOptionalString(notes),
+        },
+    })
+
+    return serializePatientDiagnosis(await withClinicalDoctorDetails(updatedRecord))
+}
+
+export const deletePatientDiagnosis = async ({ diagnosisId, doctorId }: { diagnosisId: string; doctorId?: string }) => {
+    assertClinicalTableConfig(PATIENT_DIAGNOSIS_TABLE_ID, "PATIENT_DIAGNOSIS_TABLE_ID")
+
+    if (!diagnosisId.trim()) {
+        throw new Error("Missing diagnosis record id.")
+    }
+
+    const existingRecord = await tablesDB.getRow({
+        databaseId: DATABASE_ID!,
+        tableId: PATIENT_DIAGNOSIS_TABLE_ID!,
+        rowId: diagnosisId,
+    })
+
+    if (doctorId && existingRecord.doctorId && existingRecord.doctorId !== doctorId.trim()) {
+        throw new Error("You cannot delete diagnoses recorded by another doctor.")
+    }
+
+    await tablesDB.deleteRow({
+        databaseId: DATABASE_ID!,
+        tableId: PATIENT_DIAGNOSIS_TABLE_ID!,
+        rowId: diagnosisId,
+    })
+
+    return { success: true }
+}
+
+export const createPatientPrescription = async ({
+    patientId,
+    patientUserId,
+    doctorId,
+    medicationName,
+    dosage,
+    frequency,
+    status,
+    prescribedAt,
+    instructions,
+    appointmentId,
+    duration,
+}: {
+    patientId: string
+    patientUserId: string
+    doctorId: string
+    medicationName: string
+    dosage: string
+    frequency: string
+    status: PatientPrescriptionStatus
+    prescribedAt?: string
+    instructions?: string
+    appointmentId?: string
+    duration?: string
+}) => {
+    assertClinicalTableConfig(PATIENT_PRESCRIPTION_TABLE_ID, "PATIENT_PRESCRIPTION_TABLE_ID")
+
+    const normalizedPatientId = patientId.trim()
+    const normalizedPatientUserId = patientUserId.trim()
+    const normalizedDoctorId = doctorId.trim()
+    const normalizedMedicationName = medicationName.trim()
+    const normalizedDosage = dosage.trim()
+    const normalizedFrequency = frequency.trim()
+
+    if (!normalizedPatientId || !normalizedPatientUserId || !normalizedDoctorId || !normalizedMedicationName || !normalizedDosage || !normalizedFrequency) {
+        throw new Error("Missing required prescription details.")
+    }
+
+    const record = await tablesDB.createRow({
+        databaseId: DATABASE_ID!,
+        tableId: PATIENT_PRESCRIPTION_TABLE_ID!,
+        rowId: ID.unique(),
+        data: {
+            patientId: normalizedPatientId,
+            patientUserId: normalizedPatientUserId,
+            doctorId: normalizedDoctorId,
+            medicationName: normalizedMedicationName,
+            dosage: normalizedDosage,
+            frequency: normalizedFrequency,
+            status: normalizePatientPrescriptionStatus(status),
+            prescribedAt: normalizeIsoDateString(prescribedAt),
+            instructions: normalizeOptionalString(instructions),
+            appointmentId: normalizeOptionalString(appointmentId),
+            duration: normalizeOptionalString(duration),
+        },
+    })
+
+    return serializePatientPrescription(await withClinicalDoctorDetails(record))
+}
+
+export const updatePatientPrescription = async ({
+    prescriptionId,
+    doctorId,
+    medicationName,
+    dosage,
+    frequency,
+    status,
+    prescribedAt,
+    instructions,
+    duration,
+}: {
+    prescriptionId: string
+    doctorId?: string
+    medicationName: string
+    dosage: string
+    frequency: string
+    status: PatientPrescriptionStatus
+    prescribedAt?: string
+    instructions?: string
+    duration?: string
+}) => {
+    assertClinicalTableConfig(PATIENT_PRESCRIPTION_TABLE_ID, "PATIENT_PRESCRIPTION_TABLE_ID")
+
+    const normalizedPrescriptionId = prescriptionId.trim()
+    const normalizedMedicationName = medicationName.trim()
+    const normalizedDosage = dosage.trim()
+    const normalizedFrequency = frequency.trim()
+
+    if (!normalizedPrescriptionId || !normalizedMedicationName || !normalizedDosage || !normalizedFrequency) {
+        throw new Error("Missing prescription details.")
+    }
+
+    const existingRecord = await tablesDB.getRow({
+        databaseId: DATABASE_ID!,
+        tableId: PATIENT_PRESCRIPTION_TABLE_ID!,
+        rowId: normalizedPrescriptionId,
+    })
+
+    if (doctorId && existingRecord.doctorId && existingRecord.doctorId !== doctorId.trim()) {
+        throw new Error("You cannot edit prescriptions recorded by another doctor.")
+    }
+
+    const updatedRecord = await tablesDB.updateRow({
+        databaseId: DATABASE_ID!,
+        tableId: PATIENT_PRESCRIPTION_TABLE_ID!,
+        rowId: normalizedPrescriptionId,
+        data: {
+            medicationName: normalizedMedicationName,
+            dosage: normalizedDosage,
+            frequency: normalizedFrequency,
+            status: normalizePatientPrescriptionStatus(status),
+            prescribedAt: normalizeIsoDateString(prescribedAt || existingRecord.prescribedAt),
+            instructions: normalizeOptionalString(instructions),
+            duration: normalizeOptionalString(duration),
+        },
+    })
+
+    return serializePatientPrescription(await withClinicalDoctorDetails(updatedRecord))
+}
+
+export const deletePatientPrescription = async ({ prescriptionId, doctorId }: { prescriptionId: string; doctorId?: string }) => {
+    assertClinicalTableConfig(PATIENT_PRESCRIPTION_TABLE_ID, "PATIENT_PRESCRIPTION_TABLE_ID")
+
+    if (!prescriptionId.trim()) {
+        throw new Error("Missing prescription record id.")
+    }
+
+    const existingRecord = await tablesDB.getRow({
+        databaseId: DATABASE_ID!,
+        tableId: PATIENT_PRESCRIPTION_TABLE_ID!,
+        rowId: prescriptionId,
+    })
+
+    if (doctorId && existingRecord.doctorId && existingRecord.doctorId !== doctorId.trim()) {
+        throw new Error("You cannot delete prescriptions recorded by another doctor.")
+    }
+
+    await tablesDB.deleteRow({
+        databaseId: DATABASE_ID!,
+        tableId: PATIENT_PRESCRIPTION_TABLE_ID!,
+        rowId: prescriptionId,
+    })
+
+    return { success: true }
 }
 
 export const updatePatientAccountStatus = async ({

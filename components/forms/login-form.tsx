@@ -5,6 +5,7 @@ import { useState } from "react"
 import { Controller, useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useRouter } from "next/navigation"
+import Link from "next/link"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -18,14 +19,11 @@ import {
 } from "@/components/ui/field"
 import { PhoneNumberInput } from "@/components/ui/phone-number-input"
 import CustomFormField from "../CustomFormField"
-import { createUser, getPatientByUserId } from "@/lib/actions/patient.action"
+import { createUser } from "@/lib/actions/patient.action"
 import {
-  activatePatientSession,
   beginPendingPatientSession,
 } from "@/lib/actions/auth-session.action"
 import {
-  clearPendingPatientUserId,
-  setCurrentPatientUserId,
   setPendingPatientUserId,
   setStoredPatientName,
 } from "@/lib/patient-session"
@@ -38,12 +36,13 @@ const userFormSchema = z.object({
     .regex(/^\+[1-9]\d{7,14}$/, "Phone must be in E.164 format, e.g. +14155552671"),
 })
 
-export const LoginForm = ({
+export const PatientSignupForm = ({
   className,
   ...props
 }: React.ComponentProps<"div">) => {
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(false)
+  const [errorMessage, setErrorMessage] = useState("")
 
   const form = useForm<z.infer<typeof userFormSchema>>({
     resolver: zodResolver(userFormSchema),
@@ -56,32 +55,21 @@ export const LoginForm = ({
 
   const onSubmit = async (values: z.infer<typeof userFormSchema>) => {
     setIsLoading(true)
+    setErrorMessage("")
 
     try {
       const newUser = await createUser(values)
-      console.log("User created:", newUser)
+
       if (newUser?.$id) {
-        setCurrentPatientUserId(newUser.$id)
         setPendingPatientUserId(newUser.$id)
         setStoredPatientName(newUser.$id, values.name)
-
-        const existingPatient = await getPatientByUserId(newUser.$id)
-
-        if (existingPatient) {
-          await activatePatientSession(newUser.$id)
-          if (existingPatient.name) {
-            setStoredPatientName(newUser.$id, existingPatient.name)
-          }
-          clearPendingPatientUserId()
-          router.push("/patientsDashboard")
-          return
-        }
 
         await beginPendingPatientSession(newUser.$id)
         router.push(`/patients/${newUser.$id}/register`)
       }
-    } catch (error) {
-      console.error("Failed to create user:", error)
+    } catch (error: any) {
+      console.error("Failed to sign up patient:", error)
+      setErrorMessage(error?.message || "Unable to create your account right now.")
     } finally {
       setIsLoading(false)
     }
@@ -96,7 +84,7 @@ export const LoginForm = ({
               <div className="flex flex-col items-center gap-2 text-center">
                 <h1 className="text-4xl font-semibold tracking-tight md:text-5xl">Welcome to NetCare</h1>
                 <p className="max-w-md text-balance text-base text-muted-foreground md:text-lg">
-                  Login to your NetCare account
+                  Create your patient account to get started
                 </p>
               </div>
               <CustomFormField
@@ -141,9 +129,10 @@ export const LoginForm = ({
               </Field>
               <Field>
                 <Button type="submit" className="text-2xl size-35" disabled={isLoading}>
-                  {isLoading ? "Creating..." : "Get Started"}
+                  {isLoading ? "Creating..." : "Create account"}
                 </Button>
               </Field>
+              {errorMessage ? <FieldError>{errorMessage}</FieldError> : null}
               <FieldSeparator className="*:data-[slot=field-separator-content]:bg-card">
                 Or continue with
               </FieldSeparator>
@@ -177,7 +166,7 @@ export const LoginForm = ({
                 </Button>
               </Field>
               <FieldDescription className="text-center">
-                Don&apos;t have an account? <a href="#">Sign up</a>
+                Already have an account? <Link href="/auth/login" className="text-blue-600 hover:underline">Log in</Link>
               </FieldDescription>
             </FieldGroup>
           </form>
@@ -189,4 +178,6 @@ export const LoginForm = ({
       </FieldDescription>
     </div>
   )
-};
+}
+
+export const LoginForm = PatientSignupForm

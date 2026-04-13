@@ -84,3 +84,63 @@ export interface Appointment extends Models.Document {
     phone?: string;
   } | null;
 }
+
+export interface PatientVital extends Models.Document {
+  patientId: string;
+  patientUserId: string;
+  appointmentId?: string;
+  doctorId?: string;
+  doctorDetails?: {
+    id: string;
+    fullName: string;
+    avatarUrl?: string;
+    specialty?: string;
+  } | null;
+  bloodPressureSystolic?: number;
+  bloodPressureDiastolic?: number;
+  heartRate?: number;
+  respiratoryRate?: number;
+  oxygenSaturation?: number;
+  notes?: string;
+  recordedAt: string;
+  temperatureCelsius?: number;
+  weightKg?: number;
+  heightCm?: number;
+}
+
+export interface PatientPrescription extends Models.Document {
+  patientId: string;
+  patientUserId: string;
+  doctorId: string;
+  doctorDetails?: {
+    id: string;
+    fullName: string;
+    avatarUrl?: string;
+    specialty?: string;
+  } | null;
+  medicationName: string;
+  dosage: string;
+  frequency: string;
+  status: PatientPrescriptionStatus;
+  prescribedAt: string;
+  instructions?: string;
+  appointmentId?: string;
+  duration?: string;
+}
+
+export interface PatientDiagnosis extends Models.Document {
+  patientId: string;
+  patientUserId: string;
+  doctorId: string;
+  doctorDetails?: {
+    id: string;
+    fullName: string;
+    avatarUrl?: string;
+    specialty?: string;
+  } | null;
+  diagnosisName: string;
+  status: PatientDiagnosisStatus;
+  diagnosedAt: string;
+  appointmentId?: string;
+  notes?: string;
+}
