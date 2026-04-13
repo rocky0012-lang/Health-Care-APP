@@ -1,17 +1,13 @@
-# Appwrite Manual Setup: Patient Emails
+# Appwrite Manual Setup: Patient Emails (Function-First)
 
-This project now sends emails directly from server actions and also includes an optional Appwrite Function handler.
+This project is configured for function-driven email delivery to avoid duplicate sends.
 
 ## What Is Already Implemented In Code
 
-- Account-created email trigger:
-  - [lib/actions/patient.action.ts](lib/actions/patient.action.ts)
-- Appointment-created email trigger:
-  - [lib/actions/appointment.action.ts](lib/actions/appointment.action.ts)
-- Shared email sender helpers:
-  - [lib/actions/email-notification.action.ts](lib/actions/email-notification.action.ts)
-- Optional Appwrite Function handler:
-  - [appwrite/functions/patient-notifications/index.js](appwrite/functions/patient-notifications/index.js)
+- Appwrite function handler:
+   - [appwrite/functions/patient-notifications/index.js](appwrite/functions/patient-notifications/index.js)
+- Function package metadata:
+   - [appwrite/functions/patient-notifications/package.json](appwrite/functions/patient-notifications/package.json)
 
 ## 1. Configure Appwrite Messaging Provider (Required)
 
@@ -24,24 +20,14 @@ This project now sends emails directly from server actions and also includes an 
 5. Enable the provider.
 6. Send a test email from provider settings.
 
-## 2. Make Sure Environment Variables Exist In Your App
-
-In your project `.env.local`, confirm:
-
-- `NEXT_PUBLIC_ENDPOINT` (already used)
-- `PROJECT_ID` (already used)
-- `API_KEY` (already used by server actions)
-
-Because this repo already exports `messaging` from [lib/appwrite.config.ts](lib/appwrite.config.ts), no extra code env var is required for direct action-based notifications.
-
-## 3. Optional: Deploy Function-Based Notifications In Appwrite Console
-
-Use this if you want event-driven emails from Appwrite events.
+## 2. Deploy Function-Based Notifications In Appwrite Console
 
 1. Go to Functions -> Create Function
    - Name: `patient-notifications`
    - Runtime: Node.js
-2. Upload code from [appwrite/functions/patient-notifications/index.js](appwrite/functions/patient-notifications/index.js)
+2. Upload both files:
+   - [appwrite/functions/patient-notifications/index.js](appwrite/functions/patient-notifications/index.js)
+   - [appwrite/functions/patient-notifications/package.json](appwrite/functions/patient-notifications/package.json)
 3. Add function environment variables:
    - `APPWRITE_FUNCTION_ENDPOINT` = your Appwrite endpoint
    - `APPWRITE_FUNCTION_PROJECT_ID` = your project ID
@@ -51,16 +37,16 @@ Use this if you want event-driven emails from Appwrite events.
    - `APPOINTMENT_TABLE_ID` = your appointments table ID value
 4. Add trigger events:
    - `users.*.create`
-   - `databases.*.tables.<APPOINTMENT_TABLE_ID>.rows.*.create`
+   - `databases.69c90b4400393bb1bace.tables.appointment.rows.*.create`
 5. Deploy and run test events.
 
-## 4. Recommended Scope Permissions For Function API Key
+## 3. Recommended Scope Permissions For Function API Key
 
 - `users.read`
 - `rows.read` (or table/database read equivalent for your Appwrite version)
 - `messaging.write`
 
-## 5. Manual Test Checklist
+## 4. Manual Test Checklist
 
 1. Create a new patient account from signup page.
    - Expect: account-created email.
@@ -72,5 +58,5 @@ Use this if you want event-driven emails from Appwrite events.
 
 ## Notes
 
-- Email failures are non-blocking in app actions, so account/appointment creation still succeeds even if mail provider is temporarily down.
-- If both direct action emails and function triggers are enabled simultaneously, you may receive duplicate emails. Use one strategy or add deduplication.
+- If no email is sent, first verify that the function received the event in function logs.
+- If function logs show success but no mail is delivered, verify provider API key and sender/domain verification in Messaging -> Providers.

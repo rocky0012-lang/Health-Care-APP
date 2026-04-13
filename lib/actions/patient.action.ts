@@ -16,7 +16,6 @@ import { InputFile } from "node-appwrite/file"
 import { parseStringify } from "../utils"
 import type { PatientDiagnosis, PatientPrescription, PatientVital } from "../../types/appwrite.types"
 import { getDoctorById } from "./doctor.action"
-import { sendPatientAccountCreatedEmail } from "./email-notification.action"
 
 const PUBLIC_AVATAR_PERMISSIONS = [Permission.read(Role.any())]
 const DEFAULT_PATIENT_ACCOUNT_STATUS: PatientAccountStatus = "active"
@@ -575,15 +574,6 @@ export const createUser = async (user: CreateUserParams) => {
           name: user.name,
         }
     )
-
-    try {
-        await sendPatientAccountCreatedEmail({
-            userId: newUser.$id,
-            name: user.name,
-        })
-    } catch (notificationError) {
-        console.error("Patient account email notification failed:", notificationError)
-    }
 
     console.log("User created successfully:", newUser)
     return parseStringify(newUser)

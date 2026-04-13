@@ -6,7 +6,6 @@ import { APPOINTMENT_TABLE_ID, DATABASE_ID, tablesDB } from "@/lib/appwrite.conf
 import { parseStringify } from "@/lib/utils"
 import { getDoctorById, getDoctorByUserId, listDoctors } from "@/lib/actions/doctor.action"
 import { getPatientById, getPatientByUserId, sendPatientNotification } from "@/lib/actions/patient.action"
-import { sendPatientAppointmentCreatedEmail } from "@/lib/actions/email-notification.action"
 
 function assertAppointmentConfig() {
   if (!DATABASE_ID || !APPOINTMENT_TABLE_ID) {
@@ -290,19 +289,6 @@ export const createAppointment = async ({
       doctor: doctor.$id,
     },
   })
-
-  try {
-    await sendPatientAppointmentCreatedEmail({
-      userId: patientUserId,
-      patientName: patient.name,
-      doctorName: doctor.name || doctor.fullName,
-      appointmentDate: normalizedDate,
-      timeSlot: normalizedTimeSlot,
-      reason: normalizedReason,
-    })
-  } catch (notificationError) {
-    console.error("Appointment creation email notification failed:", notificationError)
-  }
 
   return serializeAppointment(await withAppointmentRelations(createdAppointment))
 }
