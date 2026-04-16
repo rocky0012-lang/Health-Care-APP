@@ -480,7 +480,7 @@ async function getPatientStatusPrefs(userId: string): Promise<PatientStatusPrefs
     }
 
     try {
-        const prefs = await users.getPrefs<PatientStatusPrefs>({ userId })
+        const prefs = await users.getPrefs<PatientStatusPrefs>(userId)
 
         return {
             accountStatus: normalizePatientStatus(prefs?.accountStatus),
@@ -493,7 +493,16 @@ async function getPatientStatusPrefs(userId: string): Promise<PatientStatusPrefs
             savedPaymentMethod: normalizePatientSavedPaymentMethod(prefs?.savedPaymentMethod),
             billingPreferences: normalizePatientBillingPreferences(prefs?.billingPreferences),
         }
-    } catch (error) {
+    } catch (error: any) {
+        const isNotFound =
+            error?.code === 404 ||
+            error?.message?.toString().toLowerCase().includes("could not be found") ||
+            error?.message?.toString().toLowerCase().includes("not found")
+
+        if (isNotFound) {
+            return {}
+        }
+
         console.error("getPatientStatusPrefs error:", error)
         return {}
     }
@@ -677,35 +686,76 @@ export const registerPatient = async (formData: FormData) => {
             identificationDocument = await uploadBucketFile(identificationFile)
         }
 
-        const patient = await tablesDB.createRow({
+        const existingPatients = await tablesDB.listRows({
             databaseId: DATABASE_ID,
             tableId: PATIENT_TABLE_ID,
-            rowId: ID.unique(),
-            data: {
-                userId,
-                name: fullName,
-                email,
-                phone,
-                birthDate: parsedBirthDate.toISOString(),
-                gender,
-                address,
-                occupation,
-                emergencyContactName,
-                emergencyContactNumber,
-                primaryPhysician,
-                insuranceProvider,
-                insurancePolicyNumber,
-                allergies,
-                currentMedication,
-                familyMedicalHistory,
-                pastMedicalHistory,
-                avatarId,
-                identificationType,
-                identificationNumber,
-                identificationDocumentId: identificationDocument,
-                privacyConsent: privacyConsent,
-            },
+            queries: [Query.equal("email", [email]), Query.limit(1)],
         })
+
+        let patient = existingPatients.rows?.[0] || null
+
+        if (patient) {
+            const updatedPatient = await tablesDB.updateRow({
+                databaseId: DATABASE_ID,
+                tableId: PATIENT_TABLE_ID,
+                rowId: patient.$id,
+                data: {
+                    userId,
+                    name: fullName,
+                    phone,
+                    birthDate: parsedBirthDate.toISOString(),
+                    gender,
+                    address,
+                    occupation,
+                    emergencyContactName,
+                    emergencyContactNumber,
+                    primaryPhysician,
+                    insuranceProvider,
+                    insurancePolicyNumber,
+                    allergies,
+                    currentMedication,
+                    familyMedicalHistory,
+                    pastMedicalHistory,
+                    avatarId,
+                    identificationType,
+                    identificationNumber,
+                    identificationDocumentId: identificationDocument,
+                    privacyConsent: privacyConsent,
+                },
+            })
+
+            patient = updatedPatient
+        } else {
+            patient = await tablesDB.createRow({
+                databaseId: DATABASE_ID,
+                tableId: PATIENT_TABLE_ID,
+                rowId: ID.unique(),
+                data: {
+                    userId,
+                    name: fullName,
+                    email,
+                    phone,
+                    birthDate: parsedBirthDate.toISOString(),
+                    gender,
+                    address,
+                    occupation,
+                    emergencyContactName,
+                    emergencyContactNumber,
+                    primaryPhysician,
+                    insuranceProvider,
+                    insurancePolicyNumber,
+                    allergies,
+                    currentMedication,
+                    familyMedicalHistory,
+                    pastMedicalHistory,
+                    avatarId,
+                    identificationType,
+                    identificationNumber,
+                    identificationDocumentId: identificationDocument,
+                    privacyConsent: privacyConsent,
+                },
+            })
+        }
 
         return serializePatient(patient)
     } catch (error: unknown) {
@@ -924,7 +974,39 @@ export const listPatients = async (limit = 200) => {
 
         const patientsWithStatus = await Promise.all(response.rows.map((patient) => withPatientStatus(patient)))
 
-        return patientsWithStatus
+        const uniquePatients = new Map<string, NonNullable<typeof patientsWithStatus[number]>>()
+        const uniqueEmail = new Map<string, NonNullable<typeof patientsWithStatus[number]>>()
+
+        for (const patient of patientsWithStatus) {
+            if (!patient) {
+                continue
+            }
+
+            const userKey = patient.userId || ""
+            const emailKey = typeof patient.email === "string" ? patient.email.trim().toLowerCase() : ""
+
+            if (userKey) {
+                if (!uniquePatients.has(userKey)) {
+                    uniquePatients.set(userKey, patient)
+                }
+                continue
+            }
+
+            if (emailKey) {
+                if (!uniqueEmail.has(emailKey)) {
+                    uniqueEmail.set(emailKey, patient)
+                }
+            }
+        }
+
+        const dedupedPatients = Array.from(uniquePatients.values())
+        for (const patient of uniqueEmail.values()) {
+            if (!patient.userId) {
+                dedupedPatients.push(patient)
+            }
+        }
+
+        return dedupedPatients
             .map((patient) => serializePatient(patient))
             .filter((patient): patient is NonNullable<typeof patient> => Boolean(patient))
     } catch (error) {

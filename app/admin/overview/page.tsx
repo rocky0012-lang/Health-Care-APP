@@ -1,12 +1,17 @@
 import Link from "next/link"
 import {
   AlertTriangle,
+  Banknote,
   CalendarDays,
   ClipboardList,
+  CreditCard,
   LayoutDashboard,
   LogOut,
+  Mars,
   Stethoscope,
   Users,
+  Venus,
+  Wallet,
 } from "lucide-react"
 
 import { AdminHeader } from "@/components/admin-header"
@@ -355,6 +360,36 @@ async function getDashboardData() {
     })
     .slice(0, 5)
 
+  const genderCounts = patients.reduce(
+    (accumulator, patient) => {
+      const gender = String(patient.gender || "").toLowerCase()
+      if (gender === "male") {
+        accumulator.male += 1
+      } else if (gender === "female") {
+        accumulator.female += 1
+      } else {
+        accumulator.other += 1
+      }
+      return accumulator
+    },
+    { male: 0, female: 0, other: 0 }
+  )
+
+  const billingMethodCounts = patients.reduce(
+    (accumulator, patient) => {
+      const method = String(patient.savedPaymentMethod?.method || "").toLowerCase()
+      if (method === "card") {
+        accumulator.card += 1
+      } else if (method === "mobile") {
+        accumulator.mobile += 1
+      } else if (method === "bank") {
+        accumulator.bank += 1
+      }
+      return accumulator
+    },
+    { card: 0, mobile: 0, bank: 0 }
+  )
+
   const bookingChannels = {
     web: appointments.filter((appointment) => appointment.booking_channel === "web").length,
     mobile: appointments.filter((appointment) => appointment.booking_channel === "mobile").length,
@@ -379,6 +414,8 @@ async function getDashboardData() {
     topDoctorLoad,
     upcomingAppointments,
     bookingChannels,
+    genderCounts,
+    billingMethodCounts,
   }
 }
 
@@ -413,6 +450,16 @@ function buildOverviewFallbackData() {
       mobile: 0,
       phone: 0,
     },
+    genderCounts: {
+      male: 0,
+      female: 0,
+      other: 0,
+    },
+    billingMethodCounts: {
+      card: 0,
+      mobile: 0,
+      bank: 0,
+    },
   }
 }
 
@@ -442,6 +489,8 @@ export default async function OverviewPage() {
     topDoctorLoad,
     upcomingAppointments,
     bookingChannels,
+    genderCounts,
+    billingMethodCounts,
   } = overviewResult.data
   const { dataUnavailable, dataErrorMessage } = overviewResult
 
@@ -529,6 +578,77 @@ export default async function OverviewPage() {
               subtitle={`${appointments.filter((appointment) => appointment.status === "completed").length} appointments were completed.`}
               trendValues={monthlySeries.map((month) => month.completed)}
             />
+          </div>
+
+          <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+            <Card className="overflow-hidden border-white/60 bg-white/85 shadow-[0_28px_80px_-34px_rgba(15,23,42,0.45)] backdrop-blur dark:border-slate-800/80 dark:bg-slate-900/85">
+              <CardHeader>
+                <CardDescription className="text-slate-500 dark:text-slate-400">Patient gender split</CardDescription>
+                <CardTitle className="text-2xl text-slate-900 dark:text-white">Male vs Female patients</CardTitle>
+              </CardHeader>
+              <CardContent className="grid gap-4 sm:grid-cols-2">
+                <div className="rounded-[24px] border border-slate-200/70 bg-slate-50/80 p-5 dark:border-slate-800 dark:bg-slate-950/45">
+                  <div className="flex items-center gap-3 text-sky-700">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-sky-500/10 text-sky-700">
+                      <Mars className="size-5" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Male patients</p>
+                      <p className="text-3xl font-semibold text-slate-900 dark:text-white">{genderCounts.male.toLocaleString()}</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="rounded-[24px] border border-slate-200/70 bg-slate-50/80 p-5 dark:border-slate-800 dark:bg-slate-950/45">
+                  <div className="flex items-center gap-3 text-fuchsia-700">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-fuchsia-500/10 text-fuchsia-700">
+                      <Venus className="size-5" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Female patients</p>
+                      <p className="text-3xl font-semibold text-slate-900 dark:text-white">{genderCounts.female.toLocaleString()}</p>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="overflow-hidden border-white/60 bg-white/85 shadow-[0_28px_80px_-34px_rgba(15,23,42,0.45)] backdrop-blur dark:border-slate-800/80 dark:bg-slate-900/85">
+              <CardHeader>
+                <CardDescription className="text-slate-500 dark:text-slate-400">Billing method breakdown</CardDescription>
+                <CardTitle className="text-2xl text-slate-900 dark:text-white">Patient payment channels</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {[
+                  { label: "Card", key: "card", icon: CreditCard, color: "from-fuchsia-500 to-violet-500" },
+                  { label: "Mobile wallet", key: "mobile", icon: Wallet, color: "from-emerald-500 to-teal-500" },
+                  { label: "Bank transfer", key: "bank", icon: Banknote, color: "from-sky-500 to-cyan-500" },
+                ].map((method) => {
+                  const count = billingMethodCounts[method.key as keyof typeof billingMethodCounts]
+                  const percentage = patients.length > 0 ? Math.round((count / patients.length) * 100) : 0
+                  const Icon = method.icon
+
+                  return (
+                    <div key={method.key} className="space-y-3 rounded-3xl border border-slate-200/70 bg-slate-50/80 p-4 dark:border-slate-800 dark:bg-slate-950/45">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-3">
+                          <div className={`flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br ${method.color} text-white`}>
+                            <Icon className="size-5" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-slate-800 dark:text-slate-100">{method.label}</p>
+                            <p className="text-sm text-slate-500 dark:text-slate-400">{count.toLocaleString()} patients</p>
+                          </div>
+                        </div>
+                        <span className="text-sm font-semibold text-slate-900 dark:text-white">{percentage}%</span>
+                      </div>
+                      <div className="h-3 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800">
+                        <div className="h-full rounded-full bg-[linear-gradient(90deg,#8b5cf6,#22d3ee)]" style={{ width: `${percentage}%` }} />
+                      </div>
+                    </div>
+                  )
+                })}
+              </CardContent>
+            </Card>
           </div>
 
           <div className="grid gap-6 xl:grid-cols-[minmax(0,1.45fr)_minmax(340px,0.9fr)]">

@@ -1,8 +1,9 @@
 "use server"
 
-import { DATABASE_ID, DOCTOR_TABLE_ID, tablesDB, users } from "../appwrite.config"
+import { DATABASE_ID, DOCTOR_TABLE_ID, account, tablesDB, users } from "../appwrite.config"
 import { ID, Query } from "node-appwrite"
 import { parseStringify } from "../utils"
+import { sendDoctorWelcomeEmail } from "./email-notification.action"
 
 type DoctorStatusPrefs = {
   accountStatus?: DoctorAccountStatus
@@ -327,6 +328,19 @@ function normalizeDoctorEmail(email: string) {
   return email.trim().toLowerCase()
 }
 
+async function doesDoctorUserExist(userId: string) {
+  if (!userId) {
+    return false
+  }
+
+  try {
+    await users.get(userId)
+    return true
+  } catch (error) {
+    return false
+  }
+}
+
 async function assertDoctorRecordDoesNotExist({
   userId,
   email,
@@ -371,6 +385,25 @@ export const getDoctorById = async (doctorId: string) => {
   }
 }
 
+const DOCTOR_PASSWORD_RESET_URL =
+  process.env.NEXT_PUBLIC_DOCTOR_PASSWORD_RESET_URL?.trim() ||
+  "https://netcareflow.com/doctor/reset-password"
+
+async function sendDoctorPasswordRecoveryEmail(email: string, userId: string) {
+  if (!email || !userId || !DOCTOR_PASSWORD_RESET_URL) {
+    return
+  }
+
+  try {
+    await account.createRecovery({
+      email,
+      url: DOCTOR_PASSWORD_RESET_URL,
+    })
+  } catch (recoveryError) {
+    console.error("sendDoctorPasswordRecoveryEmail error:", recoveryError)
+  }
+}
+
 export const createDoctorAccount = async (doctor: CreateDoctorAccountParams) => {
   const normalizedEmail = normalizeDoctorEmail(doctor.email)
 
@@ -381,6 +414,16 @@ export const createDoctorAccount = async (doctor: CreateDoctorAccountParams) => 
       password: doctor.password,
       phone: doctor.phone,
       name: doctor.fullName,
+    })
+
+    await sendDoctorWelcomeEmail({
+      userId: newDoctorUser.$id,
+      doctorName: doctor.fullName,
+      email: normalizedEmail,
+      temporaryPassword: doctor.password,
+      loginUrl:
+        process.env.NEXT_PUBLIC_DOCTOR_PORTAL_URL ||
+        "https://netcareflow.com/doctor/login",
     })
 
     return parseStringify(newDoctorUser)
@@ -394,6 +437,28 @@ export const createDoctorAccount = async (doctor: CreateDoctorAccountParams) => 
     console.error("createDoctorAccount error:", error)
     throw error
   }
+}
+
+export const completeDoctorPasswordRecovery = async ({
+  userId,
+  secret,
+  password,
+}: {
+  userId: string
+  secret: string
+  password: string
+}) => {
+  const normalizedPassword = password.trim()
+
+  if (!userId || !secret) {
+    throw new Error("Missing recovery token or user identifier.")
+  }
+
+  if (normalizedPassword.length < 8) {
+    throw new Error("Password must be at least 8 characters long.")
+  }
+
+  await account.updateRecovery(userId, secret, normalizedPassword)
 }
 
 export const createDoctorRecord = async (doctor: CreateDoctorRecordParams) => {
@@ -454,7 +519,7 @@ export const getDoctorByUserId = async (userId: string) => {
 
     const doctor = response.rows?.[0]
 
-    if (!doctor) {
+    if (!doctor || !(await doesDoctorUserExist(doctor.userId))) {
       return null
     }
 
@@ -480,7 +545,7 @@ export const getDoctorByEmail = async (email: string) => {
 
     const doctor = response.rows?.[0]
 
-    if (!doctor) {
+    if (!doctor || !(await doesDoctorUserExist(doctor.userId))) {
       return null
     }
 
@@ -503,11 +568,17 @@ export const listDoctors = async (limit = 6) => {
       queries: [Query.orderDesc("$createdAt"), Query.limit(limit)],
     })
 
-    const doctorsWithStatus = await Promise.all(response.rows.map((doctor) => withDoctorStatus(doctor)))
+    const doctorsWithStatus = await Promise.all(
+      response.rows.map(async (doctor) => {
+        if (!doctor.userId || !(await doesDoctorUserExist(doctor.userId))) {
+          return null
+        }
 
-    return doctorsWithStatus
-      .map((doctor) => serializeDoctor(doctor))
-      .filter((doctor): doctor is NonNullable<typeof doctor> => Boolean(doctor))
+        return serializeDoctor(await withDoctorStatus(doctor))
+      })
+    )
+
+    return doctorsWithStatus.filter((doctor): doctor is NonNullable<typeof doctor> => Boolean(doctor))
   } catch (error) {
     console.error("listDoctors error:", error)
     throw error

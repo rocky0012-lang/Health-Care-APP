@@ -1,8 +1,0 @@
-{
-  "name": "patient-notifications-function",
-  "version": "1.0.0",
-  "private": true,
-  "dependencies": {
-    "node-appwrite": "^13.0.0"
-  }
-}

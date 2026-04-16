@@ -195,8 +195,24 @@ module.exports = async ({ req, res, log, error }) => {
         await sendEmailToUser({
           messaging,
           userId,
-          subject: "Your NetCare account was created",
-          html: `<h2>Welcome to NetCare, ${escapeHtml(name)}</h2><p>Your account was created successfully.</p>`,
+          subject: `Welcome to NetCare, ${name}! 🚀`,
+          html: `
+            <p>Hi ${escapeHtml(name)},</p>
+            <p>We’re thrilled to have you on board! You’ve taken the first step toward seamless appointment management and secure care coordination.</p>
+            <p>To help you hit the ground running, here are the first three things you can do:</p>
+            <ol>
+              <li><strong>Complete Your Profile:</strong> Add your details to ensure a personalized experience.</li>
+              <li><strong>Book Your First Appointment:</strong> Check out available slots and get started.</li>
+              <li><strong>Explore the Dashboard:</strong> Get familiar with your tools and settings.</li>
+            </ol>
+            <p><strong>Quick Links:</strong></p>
+            <ul>
+              <li><a href="https://your-netcare-portal.example.com/dashboard">Go to Dashboard</a></li>
+              <li><a href="https://your-netcare-portal.example.com/help">View Help Center</a></li>
+            </ul>
+            <p>If you have any questions, just hit Reply—our team is always here to help.</p>
+            <p>Cheers,<br />The NetCare Flow Team</p>
+          `,
         })
       } catch (emailErr) {
         log(`Account email send failed: ${emailErr?.message || emailErr}`)
@@ -223,12 +239,20 @@ module.exports = async ({ req, res, log, error }) => {
       const resolvedDatabaseId = DATABASE_ID || eventDatabaseId
 
       const reason = payload.reason_for_visit || "General consultation"
-      const appointmentDate = payload.appointment_date
-        ? new Date(payload.appointment_date).toLocaleString()
-        : payload.time_slot || ""
-
-      log(`Appointment payload keys: ${Object.keys(payload).join(", ")}`)
-      log(`payload.patient type: ${typeof payload.patient}, value: ${JSON.stringify(payload.patient)}`)
+      const appointmentDateObj = payload.appointment_date ? new Date(payload.appointment_date) : null
+      const appointmentDateText = appointmentDateObj && !Number.isNaN(appointmentDateObj.getTime())
+        ? appointmentDateObj.toLocaleDateString("en-US", {
+            weekday: "long",
+            month: "long",
+            day: "numeric",
+            year: "numeric",
+          })
+        : ""
+      const appointmentTimeText = payload.time_slot || (
+        appointmentDateObj && !Number.isNaN(appointmentDateObj.getTime())
+          ? appointmentDateObj.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
+          : ""
+      )
 
       // Patient ref may be a resolved document object or a plain string ID
       const patientRef = payload.patient
@@ -238,24 +262,18 @@ module.exports = async ({ req, res, log, error }) => {
       if (patientRef && typeof patientRef === "object") {
         patientUserId = String(patientRef.userId || "")
         patientName = String(patientRef.name || "Patient")
-        log(`Patient resolved inline: userId="${patientUserId}" name="${patientName}"`)
       } else if (typeof patientRef === "string" && patientRef) {
-        log(`Looking up patient doc: db=${resolvedDatabaseId} col=${PATIENT_TABLE_ID} id=${patientRef}`)
         try {
           const patientDoc = await databases.getDocument(resolvedDatabaseId, PATIENT_TABLE_ID, patientRef)
-          log(`Patient doc keys: ${Object.keys(patientDoc || {}).join(", ")}`)
           patientUserId = String(patientDoc?.userId || "")
           patientName = String(patientDoc?.name || "Patient")
-          log(`Patient fetched: userId="${patientUserId}" name="${patientName}"`)
         } catch (fetchErr) {
-          log(`Patient doc fetch failed: ${fetchErr?.message || fetchErr}`)
+          log(`Patient document lookup failed: ${fetchErr?.message || fetchErr}`)
         }
-      } else {
-        log(`Cannot resolve patient ref: ${JSON.stringify(patientRef)}`)
       }
 
       if (!patientUserId) {
-        log("No patient userId found — cannot send appointment email")
+        log("No valid patient userId found — appointment email skipped")
         return res.json({ ok: true, ignored: true, reason: "missing patient userId" })
       }
 
@@ -269,15 +287,28 @@ module.exports = async ({ req, res, log, error }) => {
         const user = await users.get(patientUserId)
         patientName = (user.name || patientName).trim() || "Patient"
       } catch (userErr) {
-        log(`users.get failed (non-fatal): ${userErr?.message || userErr}`)
+        // Ignore lookup failures and keep the original patient display name.
       }
 
       try {
         await sendEmailToUser({
           messaging,
           userId: patientUserId,
-          subject: "Your NetCare appointment is booked",
-          html: `<h2>Appointment confirmed</h2><p>Hi ${escapeHtml(patientName)}, your appointment has been booked successfully.</p><p><strong>Date:</strong> ${escapeHtml(appointmentDate)}</p><p><strong>Reason:</strong> ${escapeHtml(reason)}</p>`,
+          subject: `🗓️ Confirmed: Your Appointment for ${reason}`,
+          html: `
+            <p>Hi ${escapeHtml(patientName)},</p>
+            <p>Your appointment has been successfully scheduled. We’ve reserved your time slot, and our team is ready to assist you.</p>
+            <p><strong>Appointment Details:</strong></p>
+            <ul>
+              <li>• Reason/Service: ${escapeHtml(reason)}</li>
+              <li>• Date: ${escapeHtml(appointmentDateText)}</li>
+              <li>• Time: ${escapeHtml(appointmentTimeText)}</li>
+              <li>• Status: Confirmed ✅</li>
+            </ul>
+            <p><strong>What should I bring?</strong><br />Please ensure you have all necessary documentation ready for the verification process to avoid any delays.</p>
+            <p><strong>Need to make a change?</strong><br />If you need to reschedule or cancel, please visit our portal or contact support at least 24 hours in advance.</p>
+            <p>Best regards,<br />The NetCare Flow Team</p>
+          `,
         })
         log(`Appointment email sent to userId=${patientUserId}`)
       } catch (emailErr) {

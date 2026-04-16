@@ -6,6 +6,7 @@ import { APPOINTMENT_TABLE_ID, DATABASE_ID, tablesDB } from "@/lib/appwrite.conf
 import { parseStringify } from "@/lib/utils"
 import { getDoctorById, getDoctorByUserId, listDoctors } from "@/lib/actions/doctor.action"
 import { getPatientById, getPatientByUserId, sendPatientNotification } from "@/lib/actions/patient.action"
+import { sendPatientAppointmentCancelledEmail } from "@/lib/actions/email-notification.action"
 
 function assertAppointmentConfig() {
   if (!DATABASE_ID || !APPOINTMENT_TABLE_ID) {
@@ -457,6 +458,16 @@ export const updateAppointmentStatus = async ({
       actorDoctorName: actingDoctorName,
       cancellationReason: status === "cancelled" ? normalizedCancellationReason : undefined,
     })
+
+    if (status === "cancelled") {
+      await sendPatientAppointmentCancelledEmail({
+        userId: patient.userId,
+        patientName: patient.name || patient.fullName,
+        appointmentDate: String(updatedAppointment.appointment_date || appointment.appointment_date || ""),
+        timeSlot: String(updatedAppointment.time_slot || appointment.time_slot || ""),
+        portalLink: process.env.NEXT_PUBLIC_PATIENT_PORTAL_URL,
+      })
+    }
   }
 
   return serializeAppointment(await withAppointmentRelations(updatedAppointment))

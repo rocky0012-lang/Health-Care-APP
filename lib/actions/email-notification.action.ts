@@ -93,3 +93,93 @@ export async function sendPatientAppointmentCreatedEmail({
     html,
   })
 }
+
+export async function sendPatientAppointmentCancelledEmail({
+  userId,
+  patientName,
+  appointmentDate,
+  timeSlot,
+  portalLink,
+}: {
+  userId: string
+  patientName?: string
+  appointmentDate: string
+  timeSlot: string
+  portalLink?: string
+}) {
+  const safePatientName = (patientName || "Patient").trim() || "Patient"
+  const safePortalLink = portalLink?.trim() || "https://netcare.example.com/portal"
+  const appointmentSource = appointmentDate.includes("T")
+    ? appointmentDate
+    : `${appointmentDate}T${timeSlot}:00`
+  const appointmentDateObject = new Date(appointmentSource)
+  const formattedDate = Number.isNaN(appointmentDateObject.getTime())
+    ? [appointmentDate, timeSlot].filter(Boolean).join(" ")
+    : appointmentDateObject.toLocaleString("en-US", {
+        weekday: "long",
+        month: "long",
+        day: "numeric",
+        year: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+      })
+
+  const html = `
+    <div style="font-family: Arial, sans-serif; line-height: 1.5; color: #0f172a;">
+      <h2 style="margin: 0 0 12px;">Update regarding your appointment on ${formattedDate}</h2>
+      <p style="margin: 0 0 8px;">Hi ${safePatientName},</p>
+      <p style="margin: 0 0 8px;">We are reaching out to let you know that we’ve had to cancel your upcoming appointment due to essential system optimizations aimed at improving our patient services.</p>
+      <p style="margin: 0 0 8px;"><strong>What happens next?</strong></p>
+      <p style="margin: 0 0 8px;">You can reschedule immediately via our portal here: <a href="${safePortalLink}">${safePortalLink}</a>, or wait for our coordinator to call you within 24 hours to find a new time that works for you.</p>
+      <p style="margin: 0;">We apologize for this inconvenience and appreciate your patience as we improve our platform.</p>
+    </div>
+  `
+
+  await sendEmailToUser({
+    userId,
+    subject: `Update regarding your appointment on ${formattedDate}`,
+    html,
+  })
+}
+
+export async function sendDoctorWelcomeEmail({
+  userId,
+  doctorName,
+  email,
+  temporaryPassword,
+  loginUrl,
+}: {
+  userId: string
+  doctorName?: string
+  email: string
+  temporaryPassword: string
+  loginUrl?: string
+}) {
+  const safeName = (doctorName || "Doctor").trim() || "Doctor"
+  const safeLastName = safeName.split(/\s+/).filter(Boolean).slice(-1)[0] || safeName
+  const safeLoginUrl = loginUrl?.trim() || "https://netcareflow.com/doctor/login"
+
+  const html = `
+    <div style="font-family: Arial, sans-serif; line-height: 1.5; color: #0f172a;">
+      <h2 style="margin: 0 0 12px;">Welcome to the Team! Your Account at Netcare Flow is Ready</h2>
+      <p style="margin: 0 0 8px;">Dear Dr. ${safeLastName},</p>
+      <p style="margin: 0 0 8px;">Congratulations on joining Netcare Flow! We are thrilled to have you with us.</p>
+      <p style="margin: 0 0 8px;">Your practitioner account has been successfully created. You can now access the clinical dashboard to manage your schedule and patient records.</p>
+      <p style="margin: 0 0 8px;"><strong>Your Login Credentials:</strong></p>
+      <ul style="margin: 0 0 8px 18px; padding: 0;">
+        <li><strong>Login URL:</strong> <a href="${safeLoginUrl}">${safeLoginUrl}</a></li>
+        <li><strong>Username:</strong> ${email}</li>
+        <li><strong>Temporary Password:</strong> ${temporaryPassword}</li>
+      </ul>
+      <p style="margin: 0 0 8px;"><strong>Security Note:</strong> For your protection, please log in as soon as possible and update your password under the "Account Settings" tab or change your password via the link provided.</p>
+      <p style="margin: 0 0 8px;">We look forward to your contributions to the team. If you encounter any issues logging in, please contact the IT support desk.</p>
+      <p style="margin: 0;">Best regards,<br />Medical Administration Team<br />NetCare Flow</p>
+    </div>
+  `
+
+  await sendEmailToUser({
+    userId,
+    subject: "Welcome to the Team! Your Account at Netcare Flow is Ready",
+    html,
+  })
+}
