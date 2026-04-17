@@ -1,6 +1,7 @@
 import Image from "next/image"
 import Link from "next/link"
 
+import Logo from "@/components/logo"
 import { PatientSignupForm } from "@/components/forms/login-form"
 
 export default function PatientSignupPage() {
@@ -8,7 +9,7 @@ export default function PatientSignupPage() {
     <div className="flex min-h-screen flex-col overflow-x-hidden lg:flex-row">
       <section className="container flex-1 py-10 lg:min-h-screen lg:py-0">
         <div className="sub-container flex min-h-full max-w-[896px] flex-col items-center">
-          <div className="mb-12 h-10 w-fit text-center text-24-bold text-dark-dark-900">NetCare</div>
+          <Logo width={220} height={38} className="mb-12 w-auto" />
           <PatientSignupForm />
 
           <div className="mt-8 flex w-full items-center justify-center gap-4 text-sm">

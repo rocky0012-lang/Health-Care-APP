@@ -93,6 +93,8 @@ export function LoginForm({
     setIsLoading(true)
 
     try {
+      await deleteCurrentSession()
+
       const session = await createEmailPasswordSession(normalizedEmail, password)
       if (!session.ok) {
         clearDoctorSession()

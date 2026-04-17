@@ -4,6 +4,13 @@ import { ID } from "node-appwrite"
 
 import { messaging } from "@/lib/appwrite.config"
 
+const DEFAULT_EMAIL_LOGO_URL = "https://netcareflow.com/assets/icons/logo-full.svg.png"
+const getEmailLogoHtml = () => `
+  <div style="margin-bottom:18px; text-align:center;">
+    <img src="${DEFAULT_EMAIL_LOGO_URL}" alt="NetCare Flow" style="width:175px; max-width:100%; height:auto; display:block; margin:0 auto 16px;" />
+  </div>
+`
+
 async function sendEmailToUser({
   userId,
   subject,
@@ -38,6 +45,7 @@ export async function sendPatientAccountCreatedEmail({
 
   const html = `
     <div style="font-family: Arial, sans-serif; line-height: 1.5; color: #0f172a;">
+      ${getEmailLogoHtml()}
       <h2 style="margin: 0 0 12px;">Welcome to NetCare, ${safeName}</h2>
       <p style="margin: 0 0 8px;">Your patient account was created successfully.</p>
       <p style="margin: 0;">You can now complete your profile and book appointments from your dashboard.</p>
@@ -76,6 +84,7 @@ export async function sendPatientAppointmentCreatedEmail({
 
   const html = `
     <div style="font-family: Arial, sans-serif; line-height: 1.5; color: #0f172a;">
+      ${getEmailLogoHtml()}
       <h2 style="margin: 0 0 12px;">Appointment confirmed</h2>
       <p style="margin: 0 0 8px;">Hi ${safePatientName}, your appointment has been created successfully.</p>
       <ul style="margin: 0 0 8px 18px; padding: 0;">
@@ -126,6 +135,7 @@ export async function sendPatientAppointmentCancelledEmail({
 
   const html = `
     <div style="font-family: Arial, sans-serif; line-height: 1.5; color: #0f172a;">
+      ${getEmailLogoHtml()}
       <h2 style="margin: 0 0 12px;">Update regarding your appointment on ${formattedDate}</h2>
       <p style="margin: 0 0 8px;">Hi ${safePatientName},</p>
       <p style="margin: 0 0 8px;">We are reaching out to let you know that we’ve had to cancel your upcoming appointment due to essential system optimizations aimed at improving our patient services.</p>
@@ -138,6 +148,54 @@ export async function sendPatientAppointmentCancelledEmail({
   await sendEmailToUser({
     userId,
     subject: `Update regarding your appointment on ${formattedDate}`,
+    html,
+  })
+}
+
+export async function sendPatientAppointmentCompletedEmail({
+  userId,
+  patientName,
+  doctorName,
+  appointmentDate,
+  portalLink,
+}: {
+  userId: string
+  patientName?: string
+  doctorName?: string
+  appointmentDate: string
+  portalLink?: string
+}) {
+  const safePatientName = (patientName || "Patient").trim() || "Patient"
+  const safeDoctorName = (doctorName || "Your doctor").trim() || "Your doctor"
+  const safePortalLink = portalLink?.trim() || "https://netcareflow.com/portal"
+  const appointmentSource = appointmentDate.includes("T") ? appointmentDate : `${appointmentDate}`
+  const appointmentDateObject = new Date(appointmentSource)
+  const formattedDate = Number.isNaN(appointmentDateObject.getTime())
+    ? appointmentSource
+    : appointmentDateObject.toLocaleDateString("en-US", {
+        weekday: "long",
+        month: "long",
+        day: "numeric",
+        year: "numeric",
+      })
+
+  const html = `
+    <div style="font-family: Arial, sans-serif; line-height: 1.5; color: #0f172a;">
+      ${getEmailLogoHtml()}
+      <h2 style="margin: 0 0 12px;">Recap of your visit with Dr. ${safeDoctorName}</h2>
+      <p style="margin: 0 0 8px;">Hi ${safePatientName},</p>
+      <p style="margin: 0 0 8px;">Thank you for visiting us on ${formattedDate} — it was a pleasure seeing you.</p>
+      <p style="margin: 0 0 8px;">We’ve updated your records with your treatment plan. A summary of your visit and any next steps are available in your patient portal.</p>
+      <p style="margin: 0 0 8px;">If you have any questions or need support, feel free to reach out at any time.</p>
+      <p style="margin: 0 0 8px;">Take care,</p>
+      <p style="margin: 0;">NetCare Flow</p>
+      <p style="margin: 0 0 8px;"><a href="${safePortalLink}">${safePortalLink}</a></p>
+    </div>
+  `
+
+  await sendEmailToUser({
+    userId,
+    subject: `Recap of your visit with Dr. ${safeDoctorName}`,
     html,
   })
 }
@@ -161,6 +219,7 @@ export async function sendDoctorWelcomeEmail({
 
   const html = `
     <div style="font-family: Arial, sans-serif; line-height: 1.5; color: #0f172a;">
+      ${getEmailLogoHtml()}
       <h2 style="margin: 0 0 12px;">Welcome to the Team! Your Account at Netcare Flow is Ready</h2>
       <p style="margin: 0 0 8px;">Dear Dr. ${safeLastName},</p>
       <p style="margin: 0 0 8px;">Congratulations on joining Netcare Flow! We are thrilled to have you with us.</p>

@@ -1,5 +1,6 @@
 "use client"
 
+import Logo from "@/components/logo"
 import { FormEvent, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 
@@ -71,6 +72,9 @@ export default function DoctorPasswordResetPage() {
   return (
     <div className="min-h-screen bg-slate-50 p-6 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
       <div className="mx-auto flex max-w-md flex-col gap-6 rounded-3xl border border-slate-200 bg-white p-8 shadow-xl dark:border-slate-800 dark:bg-slate-900">
+        <div className="flex justify-center">
+          <Logo width={200} height={36} className="w-auto" />
+        </div>
         <div>
           <p className="text-sm uppercase tracking-[0.22em] text-slate-500 dark:text-slate-400">Doctor portal</p>
           <h1 className="mt-3 text-3xl font-semibold">Reset your password</h1>

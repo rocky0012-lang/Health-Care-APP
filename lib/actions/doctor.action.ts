@@ -517,13 +517,21 @@ export const getDoctorByUserId = async (userId: string) => {
       queries: [Query.equal("userId", [userId])],
     })
 
-    const doctor = response.rows?.[0]
-
-    if (!doctor || !(await doesDoctorUserExist(doctor.userId))) {
+    if (!response.rows?.length) {
       return null
     }
 
-    return serializeDoctor(await withDoctorStatus(doctor))
+    for (const doctor of response.rows) {
+      if (!doctor?.userId) {
+        continue
+      }
+
+      if (await doesDoctorUserExist(doctor.userId)) {
+        return serializeDoctor(await withDoctorStatus(doctor))
+      }
+    }
+
+    return null
   } catch (error) {
     console.error("getDoctorByUserId error:", error)
     throw error
@@ -543,16 +551,155 @@ export const getDoctorByEmail = async (email: string) => {
       queries: [Query.equal("email", [normalizedEmail])],
     })
 
-    const doctor = response.rows?.[0]
+    const usableDoctor = await (async () => {
+      if (!response.rows?.length) {
+        return null
+      }
 
-    if (!doctor || !(await doesDoctorUserExist(doctor.userId))) {
+      for (const doctor of response.rows) {
+        if (!doctor?.userId) {
+          continue
+        }
+
+        if (await doesDoctorUserExist(doctor.userId)) {
+          return doctor
+        }
+      }
+
+      return null
+    })()
+
+    if (!usableDoctor) {
       return null
     }
 
-    return serializeDoctor(await withDoctorStatus(doctor))
+    return serializeDoctor(await withDoctorStatus(usableDoctor))
   } catch (error) {
     console.error("getDoctorByEmail error:", error)
     throw error
+  }
+}
+
+async function getDoctorRowByUserIdRaw(userId: string) {
+  if (!DATABASE_ID || !DOCTOR_TABLE_ID) {
+    throw new Error("Missing DATABASE_ID or DOCTOR_TABLE_ID in environment")
+  }
+
+  const response = await tablesDB.listRows({
+    databaseId: DATABASE_ID,
+    tableId: DOCTOR_TABLE_ID,
+    queries: [Query.equal("userId", [userId])],
+  })
+
+  return response.rows?.[0] || null
+}
+
+async function getDoctorRowByEmailRaw(email: string) {
+  if (!DATABASE_ID || !DOCTOR_TABLE_ID) {
+    throw new Error("Missing DATABASE_ID or DOCTOR_TABLE_ID in environment")
+  }
+
+  const normalizedEmail = normalizeDoctorEmail(email)
+  const response = await tablesDB.listRows({
+    databaseId: DATABASE_ID,
+    tableId: DOCTOR_TABLE_ID,
+    queries: [Query.equal("email", [normalizedEmail])],
+  })
+
+  return response.rows?.[0] || null
+}
+
+async function repairDoctorRowForAppwriteUser(
+  rawRow: Record<string, any> | null,
+  appwriteUser: { $id: string; email?: string; name?: string; phone?: string }
+) {
+  if (!rawRow || !rawRow.$id || !DATABASE_ID || !DOCTOR_TABLE_ID || !appwriteUser.email) {
+    return rawRow
+  }
+
+  const normalizedEmail = normalizeDoctorEmail(appwriteUser.email)
+  const updatedRow = await tablesDB.updateRow({
+    databaseId: DATABASE_ID,
+    tableId: DOCTOR_TABLE_ID,
+    rowId: rawRow.$id,
+    data: {
+      userId: appwriteUser.$id,
+      fullName: rawRow.fullName?.trim() || appwriteUser.name?.trim() || normalizedEmail,
+      email: normalizedEmail,
+      phone: rawRow.phone || appwriteUser.phone || "",
+    },
+  })
+
+  return updatedRow
+}
+
+async function findExistingDoctorRecordFromAppwriteUser(appwriteUser: { $id: string; email?: string; name?: string; phone?: string }) {
+  if (!appwriteUser?.$id || !appwriteUser.email) {
+    return null
+  }
+
+  const existingByUserId = await getDoctorByUserId(appwriteUser.$id)
+  if (existingByUserId) {
+    return existingByUserId
+  }
+
+  const existingByEmail = await getDoctorByEmail(appwriteUser.email)
+  if (existingByEmail) {
+    return existingByEmail
+  }
+
+  const rawByUserId = await getDoctorRowByUserIdRaw(appwriteUser.$id)
+  if (rawByUserId) {
+    return serializeDoctor(await withDoctorStatus(rawByUserId))
+  }
+
+  const rawByEmail = await getDoctorRowByEmailRaw(appwriteUser.email)
+  if (rawByEmail) {
+    const repairedRow = await repairDoctorRowForAppwriteUser(rawByEmail, appwriteUser)
+    return serializeDoctor(await withDoctorStatus(repairedRow))
+  }
+
+  return null
+}
+
+async function findAppwriteUserByEmail(email: string) {
+  const normalizedEmail = normalizeDoctorEmail(email)
+
+  try {
+    const response = await users.list({
+      queries: [Query.equal("email", [normalizedEmail])],
+      total: false,
+    })
+
+    return response.users?.[0] || null
+  } catch (error) {
+    console.error("findAppwriteUserByEmail error:", error)
+    return null
+  }
+}
+
+async function createDoctorRecordFromAppwriteUser(appwriteUser: { $id: string; email?: string; name?: string; phone?: string }) {
+  if (!appwriteUser?.$id || !appwriteUser.email) {
+    return null
+  }
+
+  try {
+    const existingDoctor = await findExistingDoctorRecordFromAppwriteUser(appwriteUser)
+    if (existingDoctor) {
+      return existingDoctor
+    }
+
+    return await createDoctorRecord({
+      userId: appwriteUser.$id,
+      fullName: appwriteUser.name?.trim() || appwriteUser.email,
+      email: appwriteUser.email,
+      phone: appwriteUser.phone || "",
+      gender: "Other",
+      accountStatus: "active",
+    })
+  } catch (error: any) {
+    console.error("createDoctorRecordFromAppwriteUser error:", error)
+    return null
   }
 }
 
@@ -606,7 +753,16 @@ export const provisionDoctor = async (
 }
 
 export const getDoctorLoginRecord = async ({ email }: { email: string }) => {
-  const doctor = await getDoctorByEmail(email)
+  let doctor = await getDoctorByEmail(email)
+
+  if (!doctor) {
+    const appwriteUser = await findAppwriteUserByEmail(email)
+
+    if (appwriteUser) {
+      await createDoctorRecordFromAppwriteUser(appwriteUser)
+      doctor = await getDoctorByEmail(email)
+    }
+  }
 
   if (!doctor) {
     return null
