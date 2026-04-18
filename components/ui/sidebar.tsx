@@ -330,17 +330,16 @@ function SidebarInput({
 
 import Logo from "@/components/logo"
 
-function SidebarHeader({ className, ...props }: React.ComponentProps<"div">) {
+function SidebarHeader({ className, children, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="sidebar-header"
       data-sidebar="header"
-      className={cn("flex flex-col gap-2 p-2", className)}
+      className={cn("flex flex-col items-center gap-2 p-0", className)}
       {...props}
     >
-      <div className="flex items-center gap-2 group-data-[collapsible=icon]:hidden">
-        <Logo width={150} height={36} className="w-auto" />
-      </div>
+      <div className="flex w-full justify-center group-data-[collapsible=icon]:hidden"> <Logo width={145} height={30} className="w-auto" /> </div>
+      {children ? <div className="flex w-full flex-col gap-4">{children}</div> : null}
     </div>
   )
 }

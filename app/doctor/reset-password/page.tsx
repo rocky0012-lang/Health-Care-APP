@@ -8,13 +8,13 @@ export default function DoctorPasswordResetPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const userId = searchParams.get("userId")
-  const secret = searchParams.get("secret")
+  const token = searchParams.get("token")
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
   const [status, setStatus] = useState<"idle" | "saving" | "success" | "error">("idle")
   const [message, setMessage] = useState("")
 
-  const isInvalidLink = !userId || !secret
+  const isInvalidLink = !userId || !token
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -41,7 +41,7 @@ export default function DoctorPasswordResetPage() {
         },
         body: JSON.stringify({
           userId,
-          secret,
+          token,
           password,
           confirmPassword,
         }),

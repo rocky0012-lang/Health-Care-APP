@@ -25,6 +25,13 @@ export default function LoginPage() {
               </p>
             </div>
             <LoginForm redirectTo="/doctor/dashboard" />
+            <div className="text-center">
+              <Button variant="link" asChild>
+                <Link href="/doctor/forgot-password">
+                  Forgot password?
+                </Link>
+              </Button>
+            </div>
             <Button asChild variant="outline" className="w-full">
               <Link href="/">
                 <Home className="mr-2 size-4" />

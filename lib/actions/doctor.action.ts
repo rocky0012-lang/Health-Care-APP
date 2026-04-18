@@ -3,7 +3,7 @@
 import { DATABASE_ID, DOCTOR_TABLE_ID, account, tablesDB, users } from "../appwrite.config"
 import { ID, Query } from "node-appwrite"
 import { parseStringify } from "../utils"
-import { sendDoctorWelcomeEmail } from "./email-notification.action"
+import { sendEmail, generatePasswordResetEmail, sendDoctorWelcomeEmail } from "../email"
 
 type DoctorStatusPrefs = {
   accountStatus?: DoctorAccountStatus
@@ -389,18 +389,34 @@ const DOCTOR_PASSWORD_RESET_URL =
   process.env.NEXT_PUBLIC_DOCTOR_PASSWORD_RESET_URL?.trim() ||
   "https://netcareflow.com/doctor/reset-password"
 
-async function sendDoctorPasswordRecoveryEmail(email: string, userId: string) {
-  if (!email || !userId || !DOCTOR_PASSWORD_RESET_URL) {
+async function sendDoctorPasswordRecoveryEmail(email: string, userId: string, fullName: string) {
+  if (!email || !userId) {
     return
   }
 
   try {
-    await account.createRecovery({
-      email,
-      url: DOCTOR_PASSWORD_RESET_URL,
+    // Generate a simple reset token (in production, use JWT or more secure)
+    const resetToken = ID.unique()
+    const expiry = Date.now() + 3600000 // 1 hour
+
+    // Store token in user prefs
+    await users.updatePrefs(userId, {
+      resetToken,
+      resetTokenExpiry: expiry,
     })
-  } catch (recoveryError) {
-    console.error("sendDoctorPasswordRecoveryEmail error:", recoveryError)
+
+    // Generate reset URL
+    const resetUrl = `${process.env.NEXT_PUBLIC_APP_URL}/doctor/reset-password?token=${resetToken}&userId=${userId}`
+
+    // Send custom email
+    const html = generatePasswordResetEmail(resetUrl, fullName)
+    await sendEmail({
+      to: email,
+      subject: 'Password Reset Request - NetCare',
+      html,
+    })
+  } catch (error) {
+    console.error("sendDoctorPasswordRecoveryEmail error:", error)
   }
 }
 
@@ -439,18 +455,46 @@ export const createDoctorAccount = async (doctor: CreateDoctorAccountParams) => 
   }
 }
 
+export const initiateDoctorPasswordRecovery = async (email: string) => {
+  const normalizedEmail = email.trim().toLowerCase()
+
+  if (!normalizedEmail) {
+    throw new Error("Email is required.")
+  }
+
+  // Find the doctor by email
+  const doctors = await tablesDB.listRows({
+    databaseId: DATABASE_ID!,
+    tableId: DOCTOR_TABLE_ID!,
+    queries: [Query.equal("email", [normalizedEmail]), Query.limit(1)],
+  })
+
+  if (!doctors.rows || doctors.rows.length === 0) {
+    throw new Error("No doctor account found with this email.")
+  }
+
+  const doctor = doctors.rows[0]
+  const userId = doctor.userId
+
+  if (!userId) {
+    throw new Error("Doctor account is not properly linked.")
+  }
+
+  await sendDoctorPasswordRecoveryEmail(normalizedEmail, userId, doctor.fullName)
+}
+
 export const completeDoctorPasswordRecovery = async ({
   userId,
-  secret,
+  token,
   password,
 }: {
   userId: string
-  secret: string
+  token: string
   password: string
 }) => {
   const normalizedPassword = password.trim()
 
-  if (!userId || !secret) {
+  if (!userId || !token) {
     throw new Error("Missing recovery token or user identifier.")
   }
 
@@ -458,7 +502,26 @@ export const completeDoctorPasswordRecovery = async ({
     throw new Error("Password must be at least 8 characters long.")
   }
 
-  await account.updateRecovery(userId, secret, normalizedPassword)
+  // Get user prefs
+  const user = await users.get(userId)
+  const prefs = user.prefs || {}
+
+  if (prefs.resetToken !== token) {
+    throw new Error("Invalid reset token.")
+  }
+
+  if (Date.now() > (prefs.resetTokenExpiry || 0)) {
+    throw new Error("Reset token has expired.")
+  }
+
+  // Update password
+  await users.updatePassword(userId, normalizedPassword)
+
+  // Clear the token
+  await users.updatePrefs(userId, {
+    resetToken: null,
+    resetTokenExpiry: null,
+  })
 }
 
 export const createDoctorRecord = async (doctor: CreateDoctorRecordParams) => {

@@ -1,5 +1,7 @@
-import { BellRing, LockKeyhole, ShieldCheck, SlidersHorizontal } from "lucide-react"
+import Link from "next/link"
+import { BellRing, KeyRound, LockKeyhole, ShieldCheck, SlidersHorizontal } from "lucide-react"
 
+import { Button } from "@/components/ui/button"
 import {
   Card,
   CardAction,
@@ -74,6 +76,29 @@ export default function DoctorSettingsPage() {
             <p className="text-sm text-muted-foreground">
               Role activation and account approval remain controlled by admin-managed doctor records.
             </p>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-rose-50/80 sm:col-span-2 dark:bg-rose-950/20">
+          <CardHeader>
+            <CardDescription>Security</CardDescription>
+            <CardTitle>Reset/change password</CardTitle>
+            <CardAction>
+              <div className="rounded-full bg-white/90 p-2 dark:bg-slate-800">
+                <KeyRound className="size-5 text-rose-600" />
+              </div>
+            </CardAction>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm text-muted-foreground">
+              Use the password reset flow to update your doctor account password securely.
+            </p>
+            <Button asChild>
+              <Link href="/doctor/forgot-password">
+                <KeyRound className="mr-2 size-4" />
+                Reset Password
+              </Link>
+            </Button>
           </CardContent>
         </Card>
       </section>

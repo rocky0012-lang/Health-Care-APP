@@ -9,6 +9,7 @@ import { getPatientById, getPatientByUserId, sendPatientNotification } from "@/l
 import {
   sendPatientAppointmentCancelledEmail,
   sendPatientAppointmentCompletedEmail,
+  sendPatientAppointmentCreatedEmail,
 } from "@/lib/actions/email-notification.action"
 
 function assertAppointmentConfig() {
@@ -293,6 +294,21 @@ export const createAppointment = async ({
       doctor: doctor.$id,
     },
   })
+
+  // Send appointment confirmation email
+  try {
+    await sendPatientAppointmentCreatedEmail({
+      userId: patientUserId,
+      patientName: patient.name,
+      doctorName: doctor.name || doctor.fullName || "Doctor",
+      appointmentDate: normalizedDate,
+      timeSlot: normalizedTimeSlot,
+      reason: normalizedReason,
+    })
+  } catch (emailError) {
+    console.error("Failed to send appointment confirmation email:", emailError)
+    // Don't fail appointment creation if email fails
+  }
 
   return serializeAppointment(await withAppointmentRelations(createdAppointment))
 }

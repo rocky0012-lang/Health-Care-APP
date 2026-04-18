@@ -15,6 +15,7 @@ import { ID, Permission, Query, Role } from "node-appwrite"
 import { InputFile } from "node-appwrite/file"
 import { parseStringify } from "../utils"
 import type { PatientDiagnosis, PatientPrescription, PatientVital } from "../../types/appwrite.types"
+import { sendPatientWelcomeEmail } from "../email"
 import { getDoctorById } from "./doctor.action"
 
 const PUBLIC_AVATAR_PERMISSIONS = [Permission.read(Role.any())]
@@ -585,6 +586,18 @@ export const createUser = async (user: CreateUserParams) => {
     )
 
     console.log("User created successfully:", newUser)
+
+    // Send welcome email (don't fail user creation if email fails)
+    try {
+      await sendPatientWelcomeEmail({
+        patientName: user.name,
+        email: user.email,
+      })
+    } catch (emailError) {
+      console.error("Failed to send welcome email:", emailError)
+      // Don't throw - user creation should still succeed
+    }
+
     return parseStringify(newUser)
  } catch (error: any) {
     if (error?.code === 409) {

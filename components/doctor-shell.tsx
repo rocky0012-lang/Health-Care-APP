@@ -174,16 +174,7 @@ export function DoctorShell({ pageTitle, pageDescription, children }: DoctorShel
         collapsible="icon"
         className="border-r border-slate-300/80 bg-slate-200/90 [&_[data-sidebar=sidebar]]:bg-slate-200/90 dark:border-slate-700 dark:bg-slate-800/90 dark:[&_[data-sidebar=sidebar]]:bg-slate-800/90"
       >
-        <SidebarHeader>
-          <div className="px-2 py-3">
-            <p className="text-lg font-semibold tracking-wide text-sidebar-foreground group-data-[collapsible=icon]:hidden">
-              NetCare Doctors
-            </p>
-            <p className="text-sm text-sidebar-foreground/70 group-data-[collapsible=icon]:hidden">
-              Doctor portal
-            </p>
-          </div>
-        </SidebarHeader>
+        <SidebarHeader />
 
         <SidebarContent>
           <SidebarGroup>
