@@ -11,6 +11,30 @@ const getEmailLogoHtml = () => `
   </div>
 `
 
+const renderEmailFooter = (includeUnsubscribe = true) => `
+  <div style="margin-top: 24px; background-color: #f8f9fa; padding: 30px 20px; border-top: 1px solid #e9ecef; text-align: center; font-family: 'Segoe UI', Arial, sans-serif;">
+    <p style="margin: 0 0 10px 0; font-size: 14px; font-weight: 600; color: #333;">NetCare Flow Institution</p>
+    <p style="margin: 0 0 20px 0; font-size: 12px; color: #777; line-height: 1.5;">123 Medical Plaza, Nairobi, Kenya<br />Questions? Contact us at <a href="mailto:support@netcareflow.com" style="color: #1a73e8; text-decoration: none;">support@netcareflow.com</a></p>
+    ${includeUnsubscribe ? `
+    <table border="0" cellpadding="0" cellspacing="0" width="100%">
+      <tr>
+        <td align="center" style="padding-bottom: 20px;">
+          <a href="mailto:support@netcareflow.com?subject=Unsubscribe%20from%20NetCare%20emails" style="background-color: #ffffff; border: 1px solid #d1d5db; color: #4b5563; padding: 8px 16px; text-decoration: none; border-radius: 4px; font-size: 11px; font-weight: bold; display: inline-block;">UNSUBSCRIBE FROM THESE EMAILS</a>
+        </td>
+      </tr>
+    </table>
+    ` : `
+    <p style="margin: 0 0 18px 0; font-size: 12px; color: #777; line-height: 1.6; max-width: 520px; margin-left: auto; margin-right: auto;">You are receiving this mandatory service announcement regarding your scheduled healthcare appointment. These messages are essential for your care and cannot be turned off.</p>
+    `}
+    <div style="font-size: 11px; color: #999;">
+      <a href="https://netcareflow.com/privacy" style="color: #999; text-decoration: underline;">Privacy Policy</a>
+      &nbsp;&bull;&nbsp;
+      <a href="https://netcareflow.com/settings" style="color: #999; text-decoration: underline;">Notification Settings</a>
+    </div>
+    <p style="margin-top: 20px; font-size: 10px; color: #bbb; line-height: 1.4; max-width: 500px; margin-left: auto; margin-right: auto;">CONFIDENTIALITY NOTICE: This message may contain protected health information. If you are not the intended recipient, please delete this email and notify the sender immediately.</p>
+  </div>
+`
+
 async function sendEmailToUser({
   userId,
   subject,
@@ -49,6 +73,7 @@ export async function sendPatientAccountCreatedEmail({
       <h2 style="margin: 0 0 12px;">Welcome to NetCare, ${safeName}</h2>
       <p style="margin: 0 0 8px;">Your patient account was created successfully.</p>
       <p style="margin: 0;">You can now complete your profile and book appointments from your dashboard.</p>
+      ${renderEmailFooter(true)}
     </div>
   `
 
@@ -86,13 +111,19 @@ export async function sendPatientAppointmentCreatedEmail({
     <div style="font-family: Arial, sans-serif; line-height: 1.5; color: #0f172a;">
       ${getEmailLogoHtml()}
       <h2 style="margin: 0 0 12px;">Appointment confirmed</h2>
-      <p style="margin: 0 0 8px;">Hi ${safePatientName}, your appointment has been created successfully.</p>
+      <p style="margin: 0 0 8px;">Hi ${safePatientName},</p>
+      <p style="margin: 0 0 8px;">Your appointment has been successfully scheduled. We\'ve reserved your time slot, and our team is ready to assist you.</p>
+      <p style="margin: 0 0 8px;"><strong>Appointment Details:</strong></p>
       <ul style="margin: 0 0 8px 18px; padding: 0;">
-        <li><strong>Doctor:</strong> ${safeDoctorName}</li>
-        <li><strong>Date & time:</strong> ${formattedDate}</li>
-        <li><strong>Reason:</strong> ${reason}</li>
+        <li><strong>Reason/Service:</strong> ${reason}</li>
+        <li><strong>Date:</strong> ${formattedDate}</li>
+        <li><strong>Time:</strong> ${timeSlot}</li>
+        <li><strong>Status:</strong> Confirmed ✅</li>
       </ul>
-      <p style="margin: 0;">Please arrive a few minutes early for check-in.</p>
+      <p style="margin: 0 0 8px;"><strong>What should I bring?</strong><br />Please ensure you have all necessary documentation ready for the verification process to avoid any delays.</p>
+      <p style="margin: 0 0 8px;"><strong>Need to make a change?</strong><br />If you need to reschedule or cancel, please visit our portal or contact support at least 24 hours in advance.</p>
+      <p style="margin: 0;">Best regards,<br />The NetCare Flow Team</p>
+      ${renderEmailFooter(false)}
     </div>
   `
 
@@ -142,6 +173,7 @@ export async function sendPatientAppointmentCancelledEmail({
       <p style="margin: 0 0 8px;"><strong>What happens next?</strong></p>
       <p style="margin: 0 0 8px;">You can reschedule immediately via our portal here: <a href="${safePortalLink}">${safePortalLink}</a>, or wait for our coordinator to call you within 24 hours to find a new time that works for you.</p>
       <p style="margin: 0;">We apologize for this inconvenience and appreciate your patience as we improve our platform.</p>
+      ${renderEmailFooter(false)}
     </div>
   `
 
@@ -190,6 +222,7 @@ export async function sendPatientAppointmentCompletedEmail({
       <p style="margin: 0 0 8px;">Take care,</p>
       <p style="margin: 0;">NetCare Flow</p>
       <p style="margin: 0 0 8px;"><a href="${safePortalLink}">${safePortalLink}</a></p>
+      ${renderEmailFooter(false)}
     </div>
   `
 
@@ -233,6 +266,7 @@ export async function sendDoctorWelcomeEmail({
       <p style="margin: 0 0 8px;"><strong>Security Note:</strong> For your protection, please log in as soon as possible and update your password under the "Account Settings" tab or change your password via the link provided.</p>
       <p style="margin: 0 0 8px;">We look forward to your contributions to the team. If you encounter any issues logging in, please contact the IT support desk.</p>
       <p style="margin: 0;">Best regards,<br />Medical Administration Team<br />NetCare Flow</p>
+      ${renderEmailFooter(true)}
     </div>
   `
 

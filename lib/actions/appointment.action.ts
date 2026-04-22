@@ -3,6 +3,7 @@
 import { ID, Query } from "node-appwrite"
 
 import { APPOINTMENT_TABLE_ID, DATABASE_ID, tablesDB } from "@/lib/appwrite.config"
+import { withAppwriteRetry } from "@/lib/appwrite-retry"
 import { parseStringify } from "@/lib/utils"
 import { getDoctorById, getDoctorByUserId, listDoctors } from "@/lib/actions/doctor.action"
 import { getPatientById, getPatientByUserId, sendPatientNotification } from "@/lib/actions/patient.action"
@@ -279,21 +280,24 @@ export const createAppointment = async ({
     throw new Error("Choose a valid appointment date and time.")
   }
 
-  const createdAppointment = await tablesDB.createRow({
-    databaseId: DATABASE_ID!,
-    tableId: APPOINTMENT_TABLE_ID!,
-    rowId: ID.unique(),
-    data: {
-      appointment_date: appointmentDateTime.toISOString(),
-      time_slot: normalizedTimeSlot,
-      status,
-      reason_for_visit: normalizedReason,
-      notes: normalizedNotes,
-      booking_channel: bookingChannel,
-      patient: patient.$id,
-      doctor: doctor.$id,
-    },
-  })
+  const createdAppointment = await withAppwriteRetry(
+    () => tablesDB.createRow({
+      databaseId: DATABASE_ID!,
+      tableId: APPOINTMENT_TABLE_ID!,
+      rowId: ID.unique(),
+      data: {
+        appointment_date: appointmentDateTime.toISOString(),
+        time_slot: normalizedTimeSlot,
+        status,
+        reason_for_visit: normalizedReason,
+        notes: normalizedNotes,
+        booking_channel: bookingChannel,
+        patient: patient.$id,
+        doctor: doctor.$id,
+      },
+    }),
+    "createAppointment tablesDB.createRow"
+  )
 
   // Send appointment confirmation email
   try {
@@ -326,11 +330,14 @@ export const listPatientAppointments = async (patientUserId: string, limit = 25)
     return []
   }
 
-  const response = await tablesDB.listRows({
-    databaseId: DATABASE_ID!,
-    tableId: APPOINTMENT_TABLE_ID!,
-    queries: [Query.equal("patient", [patient.$id]), Query.orderDesc("appointment_date"), Query.limit(limit)],
-  })
+  const response = await withAppwriteRetry(
+    () => tablesDB.listRows({
+      databaseId: DATABASE_ID!,
+      tableId: APPOINTMENT_TABLE_ID!,
+      queries: [Query.equal("patient", [patient.$id]), Query.orderDesc("appointment_date"), Query.limit(limit)],
+    }),
+    "listPatientAppointments tablesDB.listRows"
+  )
 
   const appointmentsWithRelations = await Promise.all(
     response.rows.map((appointment) => withAppointmentRelations(appointment))
@@ -344,11 +351,15 @@ export const listPatientAppointments = async (patientUserId: string, limit = 25)
 export const listAppointments = async (limit = 100) => {
   assertAppointmentConfig()
 
-  const response = await tablesDB.listRows({
-    databaseId: DATABASE_ID!,
-    tableId: APPOINTMENT_TABLE_ID!,
-    queries: [Query.orderDesc("appointment_date"), Query.limit(limit)],
-  })
+  const response = await withAppwriteRetry(
+    () =>
+      tablesDB.listRows({
+        databaseId: DATABASE_ID!,
+        tableId: APPOINTMENT_TABLE_ID!,
+        queries: [Query.orderDesc("appointment_date"), Query.limit(limit)],
+      }),
+    "listAppointments tablesDB.listRows"
+  )
 
   const appointmentsWithRelations = await Promise.all(
     response.rows.map((appointment) => withAppointmentRelations(appointment))
@@ -372,11 +383,14 @@ export const listDoctorAppointments = async (doctorUserId: string, limit = 100) 
     return []
   }
 
-  const response = await tablesDB.listRows({
-    databaseId: DATABASE_ID!,
-    tableId: APPOINTMENT_TABLE_ID!,
-    queries: [Query.equal("doctor", [doctor.$id]), Query.orderDesc("appointment_date"), Query.limit(limit)],
-  })
+  const response = await withAppwriteRetry(
+    () => tablesDB.listRows({
+      databaseId: DATABASE_ID!,
+      tableId: APPOINTMENT_TABLE_ID!,
+      queries: [Query.equal("doctor", [doctor.$id]), Query.orderDesc("appointment_date"), Query.limit(limit)],
+    }),
+    "listDoctorAppointments tablesDB.listRows"
+  )
 
   const appointmentsWithRelations = await Promise.all(
     response.rows.map((appointment) => withAppointmentRelations(appointment))
@@ -410,11 +424,14 @@ export const updateAppointmentStatus = async ({
     throw new Error("Invalid appointment status.")
   }
 
-  const appointment = await tablesDB.getRow({
-    databaseId: DATABASE_ID!,
-    tableId: APPOINTMENT_TABLE_ID!,
-    rowId: appointmentId,
-  })
+  const appointment = await withAppwriteRetry(
+    () => tablesDB.getRow({
+      databaseId: DATABASE_ID!,
+      tableId: APPOINTMENT_TABLE_ID!,
+      rowId: appointmentId,
+    }),
+    "updateAppointmentStatus getRow"
+  )
 
   if (!appointment) {
     throw new Error("Appointment not found.")
@@ -456,18 +473,21 @@ export const updateAppointmentStatus = async ({
     }
   }
 
-  const updatedAppointment = await tablesDB.updateRow({
-    databaseId: DATABASE_ID!,
-    tableId: APPOINTMENT_TABLE_ID!,
-    rowId: appointmentId,
-    data: {
-      status,
-      notes:
-        status === "cancelled"
-          ? buildAppointmentNotes(existingVisibleNotes, normalizedCancellationReason)
-          : buildAppointmentNotes(existingVisibleNotes),
-    },
-  })
+  const updatedAppointment = await withAppwriteRetry(
+    () => tablesDB.updateRow({
+      databaseId: DATABASE_ID!,
+      tableId: APPOINTMENT_TABLE_ID!,
+      rowId: appointmentId,
+      data: {
+        status,
+        notes:
+          status === "cancelled"
+            ? buildAppointmentNotes(existingVisibleNotes, normalizedCancellationReason)
+            : buildAppointmentNotes(existingVisibleNotes),
+      },
+    }),
+    "updateAppointmentStatus tablesDB.updateRow"
+  )
 
   if (patient?.userId) {
     await notifyPatientAboutAppointmentStatus({

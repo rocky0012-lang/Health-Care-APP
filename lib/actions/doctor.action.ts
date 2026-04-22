@@ -4,6 +4,7 @@ import { DATABASE_ID, DOCTOR_TABLE_ID, account, tablesDB, users } from "../appwr
 import { ID, Query } from "node-appwrite"
 import { parseStringify } from "../utils"
 import { sendEmail, generatePasswordResetEmail, sendDoctorWelcomeEmail } from "../email"
+import { withAppwriteRetry } from "../appwrite-retry"
 
 type DoctorStatusPrefs = {
   accountStatus?: DoctorAccountStatus
@@ -334,7 +335,10 @@ async function doesDoctorUserExist(userId: string) {
   }
 
   try {
-    await users.get(userId)
+    await withAppwriteRetry(
+      () => users.get(userId),
+      "doesDoctorUserExist users.get"
+    )
     return true
   } catch (error) {
     return false
@@ -372,11 +376,14 @@ export const getDoctorById = async (doctorId: string) => {
   }
 
   try {
-    const doctor = await tablesDB.getRow({
-      databaseId: DATABASE_ID,
-      tableId: DOCTOR_TABLE_ID,
-      rowId: doctorId,
-    })
+    const doctor = await withAppwriteRetry(
+      () => tablesDB.getRow({
+        databaseId: DATABASE_ID!,
+        tableId: DOCTOR_TABLE_ID!,
+        rowId: doctorId,
+      }),
+      "getDoctorById tablesDB.getRow"
+    )
 
     return serializeDoctor(await withDoctorStatus(doctor))
   } catch (error) {
@@ -414,6 +421,7 @@ async function sendDoctorPasswordRecoveryEmail(email: string, userId: string, fu
       to: email,
       subject: 'Password Reset Request - NetCare',
       html,
+      footerType: 'transactional',
     })
   } catch (error) {
     console.error("sendDoctorPasswordRecoveryEmail error:", error)
@@ -424,13 +432,16 @@ export const createDoctorAccount = async (doctor: CreateDoctorAccountParams) => 
   const normalizedEmail = normalizeDoctorEmail(doctor.email)
 
   try {
-    const newDoctorUser = await users.create({
-      userId: ID.unique(),
-      email: normalizedEmail,
-      password: doctor.password,
-      phone: doctor.phone,
-      name: doctor.fullName,
-    })
+    const newDoctorUser = await withAppwriteRetry(
+      () => users.create({
+        userId: ID.unique(),
+        email: normalizedEmail,
+        password: doctor.password,
+        phone: doctor.phone,
+        name: doctor.fullName,
+      }),
+      "createDoctorAccount users.create"
+    )
 
     await sendDoctorWelcomeEmail({
       userId: newDoctorUser.$id,
@@ -463,11 +474,14 @@ export const initiateDoctorPasswordRecovery = async (email: string) => {
   }
 
   // Find the doctor by email
-  const doctors = await tablesDB.listRows({
-    databaseId: DATABASE_ID!,
-    tableId: DOCTOR_TABLE_ID!,
-    queries: [Query.equal("email", [normalizedEmail]), Query.limit(1)],
-  })
+  const doctors = await withAppwriteRetry(
+    () => tablesDB.listRows({
+      databaseId: DATABASE_ID!,
+      tableId: DOCTOR_TABLE_ID!,
+      queries: [Query.equal("email", [normalizedEmail]), Query.limit(1)],
+    }),
+    "initiateDoctorPasswordRecovery tablesDB.listRows"
+  )
 
   if (!doctors.rows || doctors.rows.length === 0) {
     throw new Error("No doctor account found with this email.")
@@ -503,7 +517,10 @@ export const completeDoctorPasswordRecovery = async ({
   }
 
   // Get user prefs
-  const user = await users.get(userId)
+  const user = await withAppwriteRetry(
+    () => users.get(userId),
+    "completeDoctorPasswordRecovery users.get"
+  )
   const prefs = user.prefs || {}
 
   if (prefs.resetToken !== token) {
@@ -515,13 +532,19 @@ export const completeDoctorPasswordRecovery = async ({
   }
 
   // Update password
-  await users.updatePassword(userId, normalizedPassword)
+  await withAppwriteRetry(
+    () => users.updatePassword(userId, normalizedPassword),
+    "completeDoctorPasswordRecovery users.updatePassword"
+  )
 
   // Clear the token
-  await users.updatePrefs(userId, {
-    resetToken: null,
-    resetTokenExpiry: null,
-  })
+  await withAppwriteRetry(
+    () => users.updatePrefs(userId, {
+      resetToken: null,
+      resetTokenExpiry: null,
+    }),
+    "completeDoctorPasswordRecovery users.updatePrefs"
+  )
 }
 
 export const createDoctorRecord = async (doctor: CreateDoctorRecordParams) => {
@@ -535,11 +558,12 @@ export const createDoctorRecord = async (doctor: CreateDoctorRecordParams) => {
       email: doctor.email,
     })
 
-    const record = await tablesDB.createRow({
-      databaseId: DATABASE_ID,
-      tableId: DOCTOR_TABLE_ID,
-      rowId: ID.unique(),
-      data: {
+    const record = await withAppwriteRetry(
+      () => tablesDB.createRow({
+        databaseId: DATABASE_ID!,
+        tableId: DOCTOR_TABLE_ID!,
+        rowId: ID.unique(),
+        data: {
         userId: doctor.userId,
         fullName: doctor.fullName,
         email: normalizeDoctorEmail(doctor.email),
@@ -553,7 +577,9 @@ export const createDoctorRecord = async (doctor: CreateDoctorRecordParams) => {
         profilePhoto: doctor.profilePhoto,
         isActive: normalizeDoctorStatus(doctor.accountStatus) === "active",
       },
-    })
+    }),
+      "createDoctorRecord tablesDB.createRow"
+    )
 
     await updateDoctorStatusPrefs(doctor.userId, doctor.accountStatus, doctor.accountStatusMessage)
 
@@ -574,11 +600,14 @@ export const getDoctorByUserId = async (userId: string) => {
   }
 
   try {
-    const response = await tablesDB.listRows({
-      databaseId: DATABASE_ID,
-      tableId: DOCTOR_TABLE_ID,
-      queries: [Query.equal("userId", [userId])],
-    })
+    const response = await withAppwriteRetry(
+      () => tablesDB.listRows({
+        databaseId: DATABASE_ID!,
+        tableId: DOCTOR_TABLE_ID!,
+        queries: [Query.equal("userId", [userId])],
+      }),
+      "getDoctorByUserId tablesDB.listRows"
+    )
 
     if (!response.rows?.length) {
       return null
@@ -608,11 +637,14 @@ export const getDoctorByEmail = async (email: string) => {
 
   try {
     const normalizedEmail = normalizeDoctorEmail(email)
-    const response = await tablesDB.listRows({
-      databaseId: DATABASE_ID,
-      tableId: DOCTOR_TABLE_ID,
-      queries: [Query.equal("email", [normalizedEmail])],
-    })
+    const response = await withAppwriteRetry(
+      () => tablesDB.listRows({
+        databaseId: DATABASE_ID!,
+        tableId: DOCTOR_TABLE_ID!,
+        queries: [Query.equal("email", [normalizedEmail])],
+      }),
+      "getDoctorByEmail tablesDB.listRows"
+    )
 
     const usableDoctor = await (async () => {
       if (!response.rows?.length) {
@@ -648,11 +680,14 @@ async function getDoctorRowByUserIdRaw(userId: string) {
     throw new Error("Missing DATABASE_ID or DOCTOR_TABLE_ID in environment")
   }
 
-  const response = await tablesDB.listRows({
-    databaseId: DATABASE_ID,
-    tableId: DOCTOR_TABLE_ID,
-    queries: [Query.equal("userId", [userId])],
-  })
+  const response = await withAppwriteRetry(
+    () => tablesDB.listRows({
+      databaseId: DATABASE_ID!,
+      tableId: DOCTOR_TABLE_ID!,
+      queries: [Query.equal("userId", [userId])],
+    }),
+    "getDoctorRowByUserIdRaw tablesDB.listRows"
+  )
 
   return response.rows?.[0] || null
 }
@@ -663,11 +698,14 @@ async function getDoctorRowByEmailRaw(email: string) {
   }
 
   const normalizedEmail = normalizeDoctorEmail(email)
-  const response = await tablesDB.listRows({
-    databaseId: DATABASE_ID,
-    tableId: DOCTOR_TABLE_ID,
-    queries: [Query.equal("email", [normalizedEmail])],
-  })
+  const response = await withAppwriteRetry(
+    () => tablesDB.listRows({
+      databaseId: DATABASE_ID!,
+      tableId: DOCTOR_TABLE_ID!,
+      queries: [Query.equal("email", [normalizedEmail])],
+    }),
+    "getDoctorRowByEmailRaw tablesDB.listRows"
+  )
 
   return response.rows?.[0] || null
 }
@@ -681,17 +719,20 @@ async function repairDoctorRowForAppwriteUser(
   }
 
   const normalizedEmail = normalizeDoctorEmail(appwriteUser.email)
-  const updatedRow = await tablesDB.updateRow({
-    databaseId: DATABASE_ID,
-    tableId: DOCTOR_TABLE_ID,
-    rowId: rawRow.$id,
-    data: {
-      userId: appwriteUser.$id,
-      fullName: rawRow.fullName?.trim() || appwriteUser.name?.trim() || normalizedEmail,
-      email: normalizedEmail,
-      phone: rawRow.phone || appwriteUser.phone || "",
-    },
-  })
+  const updatedRow = await withAppwriteRetry(
+    () => tablesDB.updateRow({
+      databaseId: DATABASE_ID!,
+      tableId: DOCTOR_TABLE_ID!,
+      rowId: rawRow.$id,
+      data: {
+        userId: appwriteUser.$id,
+        fullName: rawRow.fullName?.trim() || appwriteUser.name?.trim() || normalizedEmail,
+        email: normalizedEmail,
+        phone: rawRow.phone || appwriteUser.phone || "",
+      },
+    }),
+    "repairDoctorRowForAppwriteUser tablesDB.updateRow"
+  )
 
   return updatedRow
 }
@@ -772,11 +813,15 @@ export const listDoctors = async (limit = 6) => {
   }
 
   try {
-    const response = await tablesDB.listRows({
-      databaseId: DATABASE_ID,
-      tableId: DOCTOR_TABLE_ID,
-      queries: [Query.orderDesc("$createdAt"), Query.limit(limit)],
-    })
+    const response = await withAppwriteRetry(
+      () =>
+        tablesDB.listRows({
+          databaseId: DATABASE_ID!,
+          tableId: DOCTOR_TABLE_ID!,
+          queries: [Query.orderDesc("$createdAt"), Query.limit(limit)],
+        }),
+      "listDoctors tablesDB.listRows"
+    )
 
     const doctorsWithStatus = await Promise.all(
       response.rows.map(async (doctor) => {

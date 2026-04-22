@@ -17,6 +17,7 @@ import { parseStringify } from "../utils"
 import type { PatientDiagnosis, PatientPrescription, PatientVital } from "../../types/appwrite.types"
 import { sendPatientWelcomeEmail } from "../email"
 import { getDoctorById } from "./doctor.action"
+import { withAppwriteRetry } from "../appwrite-retry"
 
 const PUBLIC_AVATAR_PERMISSIONS = [Permission.read(Role.any())]
 const DEFAULT_PATIENT_ACCOUNT_STATUS: PatientAccountStatus = "active"
@@ -203,9 +204,10 @@ function buildPatientNotification({
 }
 
 async function getPatientPrefsRecord(userId: string) {
-    return users
-        .getPrefs<Record<string, any>>({ userId })
-        .catch(() => ({} as Record<string, any>))
+    return withAppwriteRetry(
+        () => users.getPrefs<Record<string, any>>({ userId }),
+        "getPatientPrefsRecord users.getPrefs"
+    ).catch(() => ({} as Record<string, any>))
 }
 
 async function updatePatientNotifications(
@@ -220,13 +222,16 @@ async function updatePatientNotifications(
     const normalizedNotifications = normalizePatientNotifications(existingPrefs.adminNotifications)
     const nextNotifications = updater(normalizedNotifications)
 
-    await users.updatePrefs({
-        userId,
-        prefs: {
-            ...existingPrefs,
-            adminNotifications: nextNotifications,
-        },
-    })
+    await withAppwriteRetry(
+        () => users.updatePrefs({
+            userId,
+            prefs: {
+                ...existingPrefs,
+                adminNotifications: nextNotifications,
+            },
+        }),
+        "updatePatientNotifications users.updatePrefs"
+    )
 
     return parseStringify(nextNotifications)
 }
@@ -396,15 +401,18 @@ async function uploadBucketFile(file: File, permissions?: string[]) {
         throw new Error("Missing NEXT_PUBLIC_BUCKET_ID in environment")
     }
 
-    const uploaded = await storage.createFile({
-        bucketId: BUCKET_ID,
-        fileId: ID.unique(),
-        file: InputFile.fromBuffer(
-            Buffer.from(await file.arrayBuffer()),
-            file.name
-        ),
-        permissions,
-    })
+    const uploaded = await withAppwriteRetry(
+        async () => storage.createFile({
+            bucketId: BUCKET_ID!,
+            fileId: ID.unique(),
+            file: InputFile.fromBuffer(
+                Buffer.from(await file.arrayBuffer()),
+                file.name
+            ),
+            permissions,
+        }),
+        "uploadBucketFile storage.createFile"
+    )
 
     return uploaded.$id
 }
@@ -415,11 +423,14 @@ async function ensureStoredPatientFileIsReadable(fileId?: string, label = "patie
     }
 
     try {
-        await storage.updateFile({
-            bucketId: BUCKET_ID,
-            fileId,
-            permissions: PUBLIC_AVATAR_PERMISSIONS,
-        })
+        await withAppwriteRetry(
+            () => storage.updateFile({
+                bucketId: BUCKET_ID!,
+                fileId,
+                permissions: PUBLIC_AVATAR_PERMISSIONS,
+            }),
+            "ensureStoredPatientFileIsReadable storage.updateFile"
+        )
 
         return true
     } catch (error) {
@@ -481,7 +492,10 @@ async function getPatientStatusPrefs(userId: string): Promise<PatientStatusPrefs
     }
 
     try {
-        const prefs = await users.getPrefs<PatientStatusPrefs>(userId)
+        const prefs = await withAppwriteRetry(
+            () => users.getPrefs<PatientStatusPrefs>(userId),
+            "getPatientStatusPrefs users.getPrefs"
+        )
 
         return {
             accountStatus: normalizePatientStatus(prefs?.accountStatus),
@@ -561,16 +575,19 @@ async function updatePatientStatusPrefs(
         ].slice(0, MAX_PATIENT_ADMIN_NOTIFICATIONS)
         : normalizedNotifications
 
-    await users.updatePrefs({
-        userId,
-        prefs: {
-            ...existingPrefs,
-            accountStatus: normalizePatientStatus(status),
-            accountStatusMessage: normalizedMessage || "",
-            accountStatusMessageUpdatedAt: normalizedMessage ? new Date().toISOString() : "",
-            adminNotifications: nextNotifications,
-        },
-    })
+    await withAppwriteRetry(
+        () => users.updatePrefs({
+            userId,
+            prefs: {
+                ...existingPrefs,
+                accountStatus: normalizePatientStatus(status),
+                accountStatusMessage: normalizedMessage || "",
+                accountStatusMessageUpdatedAt: normalizedMessage ? new Date().toISOString() : "",
+                adminNotifications: nextNotifications,
+            },
+        }),
+        "updatePatientStatusPrefs users.updatePrefs"
+    )
 }
 
 
@@ -624,9 +641,12 @@ export const getPatientLoginRecord = async ({
     }
 
     try {
-        const existingUsers = await users.list({
-            queries: [Query.equal("email", [normalizedEmail]), Query.limit(1)],
-        })
+        const existingUsers = await withAppwriteRetry(
+            () => users.list({
+                queries: [Query.equal("email", [normalizedEmail]), Query.limit(1)],
+            }),
+            "getPatientLoginRecord users.list"
+        )
 
         const user = existingUsers?.users?.[0]
         if (!user) {
@@ -699,20 +719,24 @@ export const registerPatient = async (formData: FormData) => {
             identificationDocument = await uploadBucketFile(identificationFile)
         }
 
-        const existingPatients = await tablesDB.listRows({
-            databaseId: DATABASE_ID,
-            tableId: PATIENT_TABLE_ID,
-            queries: [Query.equal("email", [email]), Query.limit(1)],
-        })
+        const existingPatients = await withAppwriteRetry(
+            () => tablesDB.listRows({
+                databaseId: DATABASE_ID!,
+                tableId: PATIENT_TABLE_ID!,
+                queries: [Query.equal("email", [email]), Query.limit(1)],
+            }),
+            "registerPatient tablesDB.listRows"
+        )
 
         let patient = existingPatients.rows?.[0] || null
 
         if (patient) {
-            const updatedPatient = await tablesDB.updateRow({
-                databaseId: DATABASE_ID,
-                tableId: PATIENT_TABLE_ID,
-                rowId: patient.$id,
-                data: {
+            const updatedPatient = await withAppwriteRetry(
+                () => tablesDB.updateRow({
+                    databaseId: DATABASE_ID!,
+                    tableId: PATIENT_TABLE_ID!,
+                    rowId: patient.$id,
+                    data: {
                     userId,
                     name: fullName,
                     phone,
@@ -735,15 +759,18 @@ export const registerPatient = async (formData: FormData) => {
                     identificationDocumentId: identificationDocument,
                     privacyConsent: privacyConsent,
                 },
-            })
+            }),
+                "registerPatient tablesDB.updateRow"
+            )
 
             patient = updatedPatient
         } else {
-            patient = await tablesDB.createRow({
-                databaseId: DATABASE_ID,
-                tableId: PATIENT_TABLE_ID,
-                rowId: ID.unique(),
-                data: {
+            patient = await withAppwriteRetry(
+                () => tablesDB.createRow({
+                    databaseId: DATABASE_ID!,
+                    tableId: PATIENT_TABLE_ID!,
+                    rowId: ID.unique(),
+                    data: {
                     userId,
                     name: fullName,
                     email,
@@ -767,7 +794,9 @@ export const registerPatient = async (formData: FormData) => {
                     identificationDocumentId: identificationDocument,
                     privacyConsent: privacyConsent,
                 },
-            })
+            }),
+                "registerPatient tablesDB.createRow"
+            )
         }
 
         return serializePatient(patient)
@@ -800,11 +829,14 @@ export const getPatientByUserId = async (userId: string) => {
             throw new Error("Missing DATABASE_ID or PATIENT_TABLE_ID in environment")
         }
 
-        const response = await tablesDB.listRows({
-            databaseId: DATABASE_ID,
-            tableId: PATIENT_TABLE_ID,
-            queries: [Query.equal("userId", [userId])],
-        })
+        const response = await withAppwriteRetry(
+            () => tablesDB.listRows({
+                databaseId: DATABASE_ID!,
+                tableId: PATIENT_TABLE_ID!,
+                queries: [Query.equal("userId", [userId])],
+            }),
+            "getPatientByUserId tablesDB.listRows"
+        )
 
         const patient = response.rows?.[0]
 
@@ -847,11 +879,14 @@ export const getPatientById = async (patientId: string) => {
             return null
         }
 
-        const patient = await tablesDB.getRow({
-            databaseId: DATABASE_ID,
-            tableId: PATIENT_TABLE_ID,
-            rowId: patientId,
-        })
+        const patient = await withAppwriteRetry(
+            () => tablesDB.getRow({
+                databaseId: DATABASE_ID!,
+                tableId: PATIENT_TABLE_ID!,
+                rowId: patientId,
+            }),
+            "getPatientById tablesDB.getRow"
+        )
 
         if (!patient) {
             return null
@@ -979,11 +1014,15 @@ export const listPatients = async (limit = 200) => {
             throw new Error("Missing DATABASE_ID or PATIENT_TABLE_ID in environment")
         }
 
-        const response = await tablesDB.listRows({
-            databaseId: DATABASE_ID,
-            tableId: PATIENT_TABLE_ID,
-            queries: [Query.orderDesc("$createdAt"), Query.limit(limit)],
-        })
+        const response = await withAppwriteRetry(
+            () =>
+                tablesDB.listRows({
+                    databaseId: DATABASE_ID!,
+                    tableId: PATIENT_TABLE_ID!,
+                    queries: [Query.orderDesc("$createdAt"), Query.limit(limit)],
+                }),
+            "listPatients tablesDB.listRows"
+        )
 
         const patientsWithStatus = await Promise.all(response.rows.map((patient) => withPatientStatus(patient)))
 

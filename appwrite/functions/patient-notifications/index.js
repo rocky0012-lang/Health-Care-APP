@@ -70,6 +70,30 @@ function escapeHtml(value) {
     .replace(/'/g, "&#39;")
 }
 
+function renderEmailFooter(includeUnsubscribe = true) {
+  return `
+    <div style="margin-top: 24px; background-color: #f8f9fa; padding: 30px 20px; border-top: 1px solid #e9ecef; text-align: center; font-family: 'Segoe UI', Arial, sans-serif;">
+      <p style="margin: 0 0 10px 0; font-size: 14px; font-weight: 600; color: #333;">NetCare Flow Institution</p>
+      <p style="margin: 0 0 20px 0; font-size: 12px; color: #777; line-height: 1.5;">123 Medical Plaza, Nairobi, Kenya<br />Questions? Contact us at <a href="mailto:support@netcareflow.com" style="color: #1a73e8; text-decoration: none;">support@netcareflow.com</a></p>
+      ${includeUnsubscribe ? `
+      <table border="0" cellpadding="0" cellspacing="0" width="100%">
+        <tr>
+          <td align="center" style="padding-bottom: 20px;">
+            <a href="mailto:support@netcareflow.com?subject=Unsubscribe%20from%20NetCare%20emails" style="background-color: #ffffff; border: 1px solid #d1d5db; color: #4b5563; padding: 8px 16px; text-decoration: none; border-radius: 4px; font-size: 11px; font-weight: bold; display: inline-block;">UNSUBSCRIBE FROM THESE EMAILS</a>
+          </td>
+        </tr>
+      </table>
+      ` : `<p style="margin: 0 0 18px 0; font-size: 12px; color: #777; line-height: 1.6; max-width: 520px; margin-left: auto; margin-right: auto;">You are receiving this mandatory service announcement regarding your scheduled healthcare appointment. These messages are essential for your care and cannot be turned off.</p>`}
+      <div style="font-size: 11px; color: #999;">
+        <a href="https://netcareflow.com/privacy" style="color: #999; text-decoration: underline;">Privacy Policy</a>
+        &nbsp;&bull;&nbsp;
+        <a href="https://netcareflow.com/settings" style="color: #999; text-decoration: underline;">Notification Settings</a>
+      </div>
+      <p style="margin-top: 20px; font-size: 10px; color: #bbb; line-height: 1.4; max-width: 500px; margin-left: auto; margin-right: auto;">CONFIDENTIALITY NOTICE: This message may contain protected health information. If you are not the intended recipient, please delete this email and notify the sender immediately.</p>
+    </div>
+  `
+}
+
 function buildClient() {
   const client = new sdk.Client()
 
@@ -207,10 +231,11 @@ module.exports = async ({ req, res, log, error }) => {
             </ol>
             <p><strong>Quick Links:</strong></p>
             <ul>
-              <li><a href="https://your-netcare-portal.example.com/dashboard">Go to Dashboard</a></li>
-              <li><a href="https://your-netcare-portal.example.com/help">View Help Center</a></li>
+              <li><a href="https://netcareflow-portal.com/dashboard">Go to Dashboard</a></li>
+              <li><a href="https://netcareflow-portal.com/help">View Help Center</a></li>
             </ul>
             <p>If you have any questions, just hit Reply—our team is always here to help.</p>
+              ${renderEmailFooter(false)}
             <p>Cheers,<br />The NetCare Flow Team</p>
           `,
         })
@@ -235,6 +260,12 @@ module.exports = async ({ req, res, log, error }) => {
         log(`Ignored appointment event for different collection/table: ${eventAppointmentId}`)
         return res.json({ ok: true, ignored: true, reason: "appointment id mismatch" })
       }
+
+      // Appointment confirmation emails are sent by the Next.js server action
+      // (lib/actions/email-notification.action.ts). Skip function-based sends
+      // to avoid duplicate patient emails for a single booking.
+      log("Appointment email skipped in function: handled by app action to prevent duplicate sends")
+      return res.json({ ok: true, ignored: true, reason: "appointment email handled by app" })
 
       const resolvedDatabaseId = DATABASE_ID || eventDatabaseId
 
@@ -307,6 +338,7 @@ module.exports = async ({ req, res, log, error }) => {
             </ul>
             <p><strong>What should I bring?</strong><br />Please ensure you have all necessary documentation ready for the verification process to avoid any delays.</p>
             <p><strong>Need to make a change?</strong><br />If you need to reschedule or cancel, please visit our portal or contact support at least 24 hours in advance.</p>
+              ${renderEmailFooter(false)}
             <p>Best regards,<br />The NetCare Flow Team</p>
           `,
         })
