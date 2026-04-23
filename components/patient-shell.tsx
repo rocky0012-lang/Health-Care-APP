@@ -14,6 +14,7 @@ import {
 } from "lucide-react"
 
 import { AdminHeader } from "@/components/admin-header"
+import { PatientCareAssistant } from "@/components/patient-care-assistant"
 import { clearPatientSessions } from "@/lib/actions/auth-session.action"
 import { getPatientByUserId, markPatientNotificationReadState } from "@/lib/actions/patient.action"
 import {
@@ -254,6 +255,8 @@ export function PatientShell({ pageTitle, pageDescription, children }: PatientSh
         )}
 
         {children}
+
+        <PatientCareAssistant />
       </SidebarInset>
     </SidebarProvider>
   )

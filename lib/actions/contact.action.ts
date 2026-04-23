@@ -3,6 +3,39 @@
 import { Resend } from 'resend'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
+const SUPPORT_EMAIL = process.env.SUPPORT_EMAIL?.trim() || process.env.CONTACT_TO_EMAIL?.trim() || ''
+const PRIMARY_CONTACT_FROM = process.env.CONTACT_FROM_EMAIL?.trim() || 'NetCare Flow <noreply@netcareflow.com>'
+const FALLBACK_CONTACT_FROM = 'NetCare Flow <onboarding@resend.dev>'
+
+function canRetryWithFallback(error: unknown) {
+  const message =
+    error && typeof error === 'object' && 'message' in error && typeof (error as { message?: unknown }).message === 'string'
+      ? ((error as { message: string }).message || '').toLowerCase()
+      : ''
+
+  return /from|domain|verify|verified|sender/.test(message)
+}
+
+async function sendWithResendFromFallback(payload: {
+  to: string | string[]
+  subject: string
+  html: string
+  replyTo?: string | string[]
+}) {
+  let result = await resend.emails.send({
+    from: PRIMARY_CONTACT_FROM,
+    ...payload,
+  })
+
+  if (result.error && PRIMARY_CONTACT_FROM !== FALLBACK_CONTACT_FROM && canRetryWithFallback(result.error)) {
+    result = await resend.emails.send({
+      from: FALLBACK_CONTACT_FROM,
+      ...payload,
+    })
+  }
+
+  return result
+}
 
 export interface ContactFormData {
   fullName: string
@@ -13,6 +46,14 @@ export interface ContactFormData {
 
 export async function submitContactForm(data: ContactFormData) {
   try {
+    if (!SUPPORT_EMAIL) {
+      console.error('Contact form misconfiguration: set SUPPORT_EMAIL or CONTACT_TO_EMAIL in environment')
+      return {
+        success: false,
+        error: 'Support inbox is not configured yet. Please try again shortly.',
+      }
+    }
+
     // Validate inputs
     if (!data.fullName || !data.email || !data.message) {
       return {
@@ -30,9 +71,9 @@ export async function submitContactForm(data: ContactFormData) {
     }
 
     // Send email to support team with contact form submission
-    const supportEmailResult = await resend.emails.send({
-      from: 'NetCare Flow <noreply@netcareflow.com>',
-      to: 'support@netcareflow.com',
+    const supportEmailResult = await sendWithResendFromFallback({
+      to: SUPPORT_EMAIL,
+      replyTo: data.email,
       subject: `New Contact Form Submission from ${data.fullName}`,
       html: `
         <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
@@ -59,7 +100,8 @@ export async function submitContactForm(data: ContactFormData) {
       `,
     })
 
-    if (!supportEmailResult.data?.id) {
+    if (supportEmailResult.error || !supportEmailResult.data?.id) {
+      console.error('Support contact email send error:', supportEmailResult.error)
       return {
         success: false,
         error: 'Failed to send your message. Please try again.',
@@ -67,8 +109,7 @@ export async function submitContactForm(data: ContactFormData) {
     }
 
     // Send confirmation email to the user
-    await resend.emails.send({
-      from: 'NetCare Flow <noreply@netcareflow.com>',
+    const confirmationResult = await sendWithResendFromFallback({
       to: data.email,
       subject: 'We received your message',
       html: `
@@ -98,6 +139,10 @@ export async function submitContactForm(data: ContactFormData) {
         </div>
       `,
     })
+
+    if (confirmationResult.error) {
+      console.error('Contact form confirmation email send error:', confirmationResult.error)
+    }
 
     return {
       success: true,

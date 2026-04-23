@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Dialog, DialogPanel } from '@headlessui/react'
 import { Bars3Icon, XMarkIcon } from '@heroicons/react/24/outline'
+import { FaFacebookF, FaGithub, FaInstagram, FaLinkedinIn } from 'react-icons/fa'
 import { Mail, MapPin, Phone } from 'lucide-react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
@@ -79,6 +80,19 @@ const physicians = [
     experience: '10 years',
     availability: 'Next slot: 4:15 PM',
   },
+]
+
+const footerLinks = [
+  { name: 'Terms of service', href: 'https://netcareflow.com/terms' },
+  { name: 'Privacy policy', href: 'https://netcareflow.com/privacy' },
+  { name: 'License', href: 'https://netcareflow.com/license' },
+]
+
+const socialLinks = [
+  { name: 'Facebook', href: 'https://facebook.com', icon: FaFacebookF },
+  { name: 'Instagram', href: 'https://instagram.com', icon: FaInstagram },
+  { name: 'LinkedIn', href: 'https://linkedin.com', icon: FaLinkedinIn },
+  { name: 'GitHub', href: 'https://github.com', icon: FaGithub },
 ]
 
 export default function LandingPage() {
@@ -202,7 +216,7 @@ export default function LandingPage() {
   }
 
   return (
-    <div className="scroll-smooth bg-gray-900">
+    <div className="flex min-h-screen flex-col scroll-smooth bg-gray-900">
       {isAdmin && <PasskeyModal />}
 
       <header className="absolute inset-x-0 top-0 z-50">
@@ -313,7 +327,7 @@ export default function LandingPage() {
           </div>
           <div className="text-center">
             <h1 className="text-5xl font-semibold tracking-tight text-balance text-white sm:text-7xl">
-              Data to enrich your healthcare booking experience
+              Connecting Patients and Healthcare Providers Seamlessly
             </h1>
             <p className="mt-8 text-lg font-medium text-pretty text-gray-400 sm:text-xl/8">
               Book appointments, manage care schedules, and keep your records organized in one secure platform built for patients and clinicians.
@@ -345,7 +359,23 @@ export default function LandingPage() {
         </div>
       </div>
 
-      <section id="appointment-flow" ref={appointmentFlowRef} className="relative isolate mt-14 overflow-hidden bg-gray-900 py-24 sm:mt-20 sm:py-32">
+      <section className="relative bg-gray-900 px-6 py-14 lg:px-8">
+        <div className="mx-auto max-w-4xl">
+          <div className="rounded-3xl border border-indigo-300/25 bg-gradient-to-r from-indigo-500/15 via-cyan-400/10 to-indigo-500/15 px-6 py-10 text-center shadow-[0_0_0_1px_rgba(129,140,248,0.12)] sm:px-10">
+            <p className="text-xs font-semibold uppercase tracking-[0.42em] text-indigo-200 sm:text-sm">
+              Care journey
+            </p>
+            <h2 className="mt-4 text-3xl font-semibold tracking-tight text-white sm:text-5xl">
+              From signup to confirmed care
+            </h2>
+            <p className="mx-auto mt-4 max-w-2xl text-base/7 text-gray-300 sm:text-lg/8">
+              Every step below is intentionally ordered so patients move from account setup to a confirmed appointment without friction.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section id="appointment-flow" ref={appointmentFlowRef} className="relative isolate overflow-hidden bg-gray-900 py-24 sm:py-32">
         <img
           alt="Patients and healthcare team coordinating care"
           src={appointmentSectionBackgroundImage}
@@ -497,7 +527,8 @@ export default function LandingPage() {
         </div>
       </section>
 
-      <section id="company" className="isolate mt-14 bg-gray-900 px-6 py-24 sm:mt-20 sm:py-32 lg:px-8">
+      <main className="flex-1">
+        <section id="company" className="isolate mt-14 bg-gray-900 px-6 py-24 sm:mt-20 sm:py-32 lg:px-8">
         <div
           aria-hidden="true"
           className="absolute inset-x-0 -top-40 -z-10 transform-gpu overflow-hidden blur-3xl sm:-top-80"
@@ -646,7 +677,51 @@ export default function LandingPage() {
             </div>
           </form>
         </div>
-      </section>
+        </section>
+      </main>
+
+      <footer className="border-t border-white/10 bg-gray-950/95">
+        <div className="mx-auto max-w-7xl px-6 py-8 lg:px-8">
+          <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
+            <div className="flex flex-wrap items-center gap-x-6 gap-y-3 text-sm font-medium text-gray-300">
+              {footerLinks.map((link) => (
+                <a
+                  key={link.name}
+                  href={link.href}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="transition-colors hover:text-white"
+                >
+                  {link.name}
+                </a>
+              ))}
+            </div>
+
+            <div className="flex items-center gap-3">
+              {socialLinks.map((social) => {
+                const Icon = social.icon
+
+                return (
+                  <a
+                    key={social.name}
+                    href={social.href}
+                    target="_blank"
+                    rel="noreferrer"
+                    aria-label={social.name}
+                    className="inline-flex size-9 items-center justify-center rounded-full border border-white/10 bg-white/5 text-gray-300 transition hover:border-white/20 hover:bg-white/10 hover:text-white"
+                  >
+                    <Icon className="size-4" />
+                  </a>
+                )
+              })}
+            </div>
+          </div>
+
+          <div className="mt-8 border-t border-white/10 pt-6 text-sm text-gray-400">
+            <p>© 2026 NetCare Flow, Inc. All rights reserved.</p>
+          </div>
+        </div>
+      </footer>
     </div>
   )
 }
