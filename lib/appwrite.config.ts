@@ -14,12 +14,24 @@ export const {
     NEXT_PUBLIC_ENDPOINT: ENDPOINT,
 } = process.env;
 
+function requireEnv(name: string, value: string | undefined) {
+  if (!value) {
+    throw new Error(`Missing required environment variable: ${name}`)
+  }
+
+  return value
+}
+
+const APPWRITE_ENDPOINT = requireEnv("NEXT_PUBLIC_ENDPOINT", ENDPOINT)
+const APPWRITE_PROJECT_ID = requireEnv("PROJECT_ID", PROJECT_ID)
+const APPWRITE_API_KEY = requireEnv("API_KEY", API_KEY)
+
 const client = new sdk.Client();
 
 client
-  .setEndpoint(ENDPOINT!)
-  .setProject(PROJECT_ID!)
-  .setKey(API_KEY!);
+  .setEndpoint(APPWRITE_ENDPOINT)
+  .setProject(APPWRITE_PROJECT_ID)
+  .setKey(APPWRITE_API_KEY);
 
 export const databases = new sdk.Databases(client);
 export const tablesDB = new sdk.TablesDB(client);

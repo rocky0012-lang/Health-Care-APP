@@ -2,7 +2,7 @@ import Image from "next/image"
 import Link from "next/link"
 
 import Logo from "@/components/logo"
-import { PatientSignupForm } from "@/components/forms/login-form"
+import { PatientSignupForm } from "@/components/forms/patient-signup-form"
 
 export default function PatientSignupPage() {
   return (
@@ -14,13 +14,7 @@ export default function PatientSignupPage() {
 
           <div className="mt-8 flex w-full items-center justify-center gap-4 text-sm">
             <Link href="/auth/login" className="text-blue-600 hover:underline">
-              Patient login
-            </Link>
-            <Link href="/doctor/login" className="text-blue-500 hover:underline">
-              Doctor
-            </Link>
-            <Link href="/?admin=true" className="text-green-500 hover:underline">
-              Admin
+              Already have an account? Log in
             </Link>
           </div>
 

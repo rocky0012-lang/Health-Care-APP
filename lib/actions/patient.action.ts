@@ -851,17 +851,6 @@ export const getPatientByUserId = async (userId: string) => {
             }
         }
 
-        if (patient.identificationDocumentId) {
-            const hasReadableIdentificationDocument = await ensureStoredPatientFileIsReadable(
-                patient.identificationDocumentId,
-                "Patient identification document"
-            )
-
-            if (!hasReadableIdentificationDocument) {
-                patient.identificationDocumentId = undefined
-            }
-        }
-
         return serializePatient(await withPatientStatus(patient))
     } catch (error) {
         console.error("getPatientByUserId error:", error)

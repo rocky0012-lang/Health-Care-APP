@@ -263,8 +263,9 @@ export async function sendDoctorWelcomeEmail({
         <li><strong>Username:</strong> ${email}</li>
         <li><strong>Temporary Password:</strong> ${temporaryPassword}</li>
       </ul>
+      <p style="margin: 0 0 8px;">If you are currently on the main website, simply append:<strong>/doctor/login</strong>to the URL in your browser's address bar.</p>
       <p style="margin: 0 0 8px;"><strong>Security Note:</strong> For your protection, please log in as soon as possible and update your password under the "Account Settings" tab or change your password via the link provided.</p>
-      <p style="margin: 0 0 8px;">We look forward to your contributions to the team. If you encounter any issues logging in, please contact the IT support desk.</p>
+      <p style="margin: 0 0 8px;">We look forward to your contributions to the team. If you encounter any issues logging in, please contact the NetCare Flow IT support desk.</p>
       <p style="margin: 0;">Best regards,<br />Medical Administration Team<br />NetCare Flow</p>
       ${renderEmailFooter(true)}
     </div>

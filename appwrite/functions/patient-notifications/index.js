@@ -207,44 +207,10 @@ module.exports = async ({ req, res, log, error }) => {
     const databases = new sdk.Databases(client)
 
     if (isUserCreateEvent) {
-      const userId = payload.$id
-      const name = (payload.name || "Patient").trim() || "Patient"
-
-      if (!isValidUserId(userId)) {
-        log(`Skipping account email: userId from event is invalid "${userId}"`)
-        return res.json({ ok: true, ignored: true, reason: "invalid user id format from event" })
-      }
-
-      try {
-        await sendEmailToUser({
-          messaging,
-          userId,
-          subject: `Welcome to NetCare, ${name}! 🚀`,
-          html: `
-            <p>Hi ${escapeHtml(name)},</p>
-            <p>We’re thrilled to have you on board! You’ve taken the first step toward seamless appointment management and secure care coordination.</p>
-            <p>To help you hit the ground running, here are the first three things you can do:</p>
-            <ol>
-              <li><strong>Complete Your Profile:</strong> Add your details to ensure a personalized experience.</li>
-              <li><strong>Book Your First Appointment:</strong> Check out available slots and get started.</li>
-              <li><strong>Explore the Dashboard:</strong> Get familiar with your tools and settings.</li>
-            </ol>
-            <p><strong>Quick Links:</strong></p>
-            <ul>
-              <li><a href="https://netcareflow-portal.com/dashboard">Go to Dashboard</a></li>
-              <li><a href="https://netcareflow-portal.com/help">View Help Center</a></li>
-            </ul>
-            <p>If you have any questions, just hit Reply—our team is always here to help.</p>
-              ${renderEmailFooter(false)}
-            <p>Cheers,<br />The NetCare Flow Team</p>
-          `,
-        })
-      } catch (emailErr) {
-        log(`Account email send failed: ${emailErr?.message || emailErr}`)
-        return res.json({ ok: true, email_error: emailErr?.message || "unknown" })
-      }
-
-      return res.json({ ok: true, type: "account-created" })
+      // User welcome emails are handled by the Next.js app actions.
+      // Keep function-based sends disabled to avoid duplicate or wrong-template messages.
+      log("User-created email skipped in function: handled by app actions")
+      return res.json({ ok: true, ignored: true, reason: "user email handled by app" })
     }
 
     if (isAppointmentCreateEvent) {

@@ -156,67 +156,6 @@ export function generatePasswordResetEmail(resetUrl: string, userName: string) {
   });
 }
 
-export async function sendDoctorWelcomeEmail({
-  userId,
-  doctorName,
-  email,
-  temporaryPassword,
-  loginUrl,
-}: {
-  userId: string;
-  doctorName: string;
-  email: string;
-  temporaryPassword: string;
-  loginUrl: string;
-}) {
-  const html = createEmailDocument({
-    title: 'Welcome to NetCare',
-    heading: `Welcome to NetCare, Dr. ${doctorName}`,
-    accentColor: '#2563eb',
-    sections: `
-      <tr>
-        <td style="padding: 0 30px; color: #333;">
-          <p>Your doctor account has been successfully created! Below are your credentials to access the NetCare portal.</p>
-        </td>
-      </tr>
-      <tr>
-        <td style="padding: 0 30px;">
-          <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f3f4f6; border-radius: 6px; border: 1px solid #e5e7eb;">
-            <tr>
-              <td style="padding: 15px;">
-                <p style="margin: 5px 0; color: #333;"><strong>Email:</strong> ${email}</p>
-                <p style="margin: 5px 0; color: #333;"><strong>Temporary Password:</strong> ${temporaryPassword}</p>
-              </td>
-            </tr>
-          </table>
-        </td>
-      </tr>
-      <tr>
-        <td style="padding: 20px 30px; color: #dc2626;">
-          <p style="margin: 0;"><strong>Important:</strong> Please change your password immediately after your first login for security reasons.</p>
-        </td>
-      </tr>
-      <tr>
-        <td align="center" style="padding: 20px;">
-          <a href="${loginUrl}" style="background-color: #2563eb; color: white; padding: 12px 28px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">Login to NetCare</a>
-        </td>
-      </tr>
-      <tr>
-        <td style="padding: 0 30px; color: #666; font-size: 14px;">
-          <p>If you have any questions or need assistance, please contact our support team.</p>
-        </td>
-      </tr>
-    `,
-  });
-
-  return sendEmail({
-    to: email,
-    subject: 'Welcome to the Team! Your Account at Netcare Flow is Ready',
-    html,
-    footerType: 'standard',
-  });
-}
-
 export async function sendPatientWelcomeEmail({
   patientName,
   email,

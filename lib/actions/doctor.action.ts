@@ -3,7 +3,8 @@
 import { DATABASE_ID, DOCTOR_TABLE_ID, account, tablesDB, users } from "../appwrite.config"
 import { ID, Query } from "node-appwrite"
 import { parseStringify } from "../utils"
-import { sendEmail, generatePasswordResetEmail, sendDoctorWelcomeEmail } from "../email"
+import { sendEmail, generatePasswordResetEmail } from "../email"
+import { sendDoctorWelcomeEmail } from "./email-notification.action"
 import { withAppwriteRetry } from "../appwrite-retry"
 
 type DoctorStatusPrefs = {

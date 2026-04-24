@@ -1,5 +1,12 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+## Project Documentation
+
+- [System Architecture and Workflow](SYSTEM_ARCHITECTURE_AND_WORKFLOW.md)
+- [Executive Summary](EXECUTIVE_SUMMARY.md)
+- [Post-Deploy Checklist](POST_DEPLOY_CHECKLIST.md)
+- [Doctor Email Single Source of Truth](DOCTOR_EMAIL_SINGLE_SOURCE_OF_TRUTH.md)
+
 ## Getting Started
 
 First, run the development server:

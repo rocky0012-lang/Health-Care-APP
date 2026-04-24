@@ -60,6 +60,7 @@ type AssistantPayload = {
   reply: string
   suggestedFilter?: string
   matches?: AssistantMatch[]
+  isFallback?: boolean
 }
 
 type SnapshotAppointment = {
@@ -68,6 +69,12 @@ type SnapshotAppointment = {
   status: any
   reason: any
   doctor: string
+}
+
+const DEFAULT_BILLING_PREFERENCES: PatientBillingPreferences = {
+  savePaymentMethod: true,
+  emailReceipt: true,
+  updatedAt: new Date(0).toISOString(),
 }
 
 function safeText(value?: string) {
@@ -291,6 +298,7 @@ function getLocalAssistantReply(message: string, snapshot: ReturnType<typeof bui
     reply,
     suggestedFilter,
     matches,
+    isFallback: true,
   }
 }
 
@@ -332,6 +340,7 @@ async function getAiAssistantReply(message: string, snapshot: ReturnType<typeof 
             .filter((match): match is AssistantMatch => Boolean(match && typeof match.title === "string" && typeof match.detail === "string"))
             .slice(0, 6)
         : undefined,
+      isFallback: false,
     }
   } catch {
     return getLocalAssistantReply(message, snapshot)
@@ -350,21 +359,51 @@ export async function POST(request: Request) {
     const { userId, messages } = parsed.data
     const latestUserMessage = [...messages].reverse().find((message) => message.role === "user")?.content || ""
 
-    const [patient, appointments, vitals, diagnoses, prescriptions, billingPreferences, savedPaymentMethod] = await Promise.all([
-      getPatientByUserId(userId),
-      listPatientAppointments(userId, 12),
-      listPatientVitals(userId, 8),
-      listPatientDiagnoses(userId, 8),
-      listPatientPrescriptions(userId, 8),
-      getPatientBillingPreferences(userId),
-      getPatientSavedPaymentMethod(userId),
-    ])
+    const [patientResult, appointmentsResult, vitalsResult, diagnosesResult, prescriptionsResult, billingPreferencesResult, savedPaymentMethodResult] =
+      await Promise.allSettled([
+        getPatientByUserId(userId),
+        listPatientAppointments(userId, 12),
+        listPatientVitals(userId, 8),
+        listPatientDiagnoses(userId, 8),
+        listPatientPrescriptions(userId, 8),
+        getPatientBillingPreferences(userId),
+        getPatientSavedPaymentMethod(userId),
+      ])
+
+    const patient = patientResult.status === "fulfilled" ? patientResult.value : null
+    const appointments = appointmentsResult.status === "fulfilled" ? appointmentsResult.value : []
+    const vitals = vitalsResult.status === "fulfilled" ? vitalsResult.value : []
+    const diagnoses = diagnosesResult.status === "fulfilled" ? diagnosesResult.value : []
+    const prescriptions = prescriptionsResult.status === "fulfilled" ? prescriptionsResult.value : []
+    const billingPreferences =
+      billingPreferencesResult.status === "fulfilled"
+        ? billingPreferencesResult.value
+        : DEFAULT_BILLING_PREFERENCES
+    const savedPaymentMethod =
+      savedPaymentMethodResult.status === "fulfilled" ? savedPaymentMethodResult.value || null : null
 
     if (!patient) {
-      return NextResponse.json({ error: "No patient record was found for this session." }, { status: 404 })
+      return NextResponse.json(
+        {
+          reply:
+            "I could not load your patient record right now, but the care assistant is still available. Please try again in a moment or contact support if the issue continues.",
+          suggestedFilter: "Support",
+          matches: [],
+          isFallback: true,
+        },
+        { status: 200 }
+      )
     }
 
-    const snapshot = buildSnapshot(patient, appointments || [], vitals || [], diagnoses || [], prescriptions || [], billingPreferences, savedPaymentMethod)
+    const snapshot = buildSnapshot(
+      patient,
+      appointments || [],
+      vitals || [],
+      diagnoses || [],
+      prescriptions || [],
+      billingPreferences,
+      savedPaymentMethod
+    )
     const assistantReply = await getAiAssistantReply(latestUserMessage, snapshot)
 
     return NextResponse.json(assistantReply)
@@ -373,9 +412,13 @@ export async function POST(request: Request) {
 
     return NextResponse.json(
       {
-        error: "The care assistant is temporarily unavailable.",
+        reply:
+          "The care assistant is having trouble reaching the care system right now. Please try again shortly, or contact support if you need help immediately.",
+        suggestedFilter: "Support",
+        matches: [],
+        isFallback: true,
       },
-      { status: 500 }
+      { status: 200 }
     )
   }
 }
