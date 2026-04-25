@@ -1,4 +1,5 @@
 import { Analytics } from '@vercel/analytics/react';
+import { SpeedInsights } from "@vercel/speed-insights/next"
 
 
 import type { Metadata } from "next";
@@ -25,6 +26,7 @@ export default function RootLayout({
           >
             {children}
             <Analytics />
+            <SpeedInsights />
           </ThemeProvider>
         </body>
     </html>
