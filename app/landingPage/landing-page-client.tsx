@@ -139,6 +139,10 @@ export default function LandingPageClient({ isAdmin }: LandingPageClientProps) {
   })
   const appointmentFlowRef = useRef<HTMLElement | null>(null)
 
+  const closeMobileMenu = () => {
+    setMobileMenuOpen(false)
+  }
+
   useEffect(() => {
     const target = appointmentFlowRef.current
 
@@ -270,7 +274,7 @@ export default function LandingPageClient({ isAdmin }: LandingPageClientProps) {
           </div>
         </nav>
         <Dialog open={mobileMenuOpen} onClose={setMobileMenuOpen} className="lg:hidden">
-          <div className="fixed inset-0 z-50" />
+          <div aria-hidden="true" className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-sm" />
           <DialogPanel className="fixed inset-y-0 right-0 z-50 w-full overflow-y-auto bg-gray-900 p-6 sm:max-w-sm sm:ring-1 sm:ring-gray-100/10">
             <div className="flex items-center justify-between">
               <Link href="/landingPage" className="-m-1.5 p-1.5">
@@ -293,6 +297,7 @@ export default function LandingPageClient({ isAdmin }: LandingPageClientProps) {
                     <a
                       key={item.name}
                       href={item.href}
+                      onClick={closeMobileMenu}
                       className="-mx-3 block rounded-lg px-3 py-2 text-base/7 font-semibold text-white hover:bg-white/5"
                     >
                       {item.name}
@@ -302,6 +307,7 @@ export default function LandingPageClient({ isAdmin }: LandingPageClientProps) {
                 <div className="py-6">
                   <Link
                     href="/auth/login"
+                    onClick={closeMobileMenu}
                     className="-mx-3 block rounded-lg px-3 py-2.5 text-base/7 font-semibold text-white hover:bg-white/5"
                   >
                     Log in
@@ -315,7 +321,7 @@ export default function LandingPageClient({ isAdmin }: LandingPageClientProps) {
 
       <div
         id="product"
-        className="relative isolate px-6 pt-28 lg:px-8"
+        className="relative isolate scroll-mt-28 px-6 pt-28 lg:scroll-mt-32 lg:px-8"
         style={{
           backgroundImage: `linear-gradient(rgba(17, 24, 39, 0.82), rgba(17, 24, 39, 0.82)), url(${heroBackgroundImage})`,
           backgroundSize: 'cover',
@@ -351,14 +357,14 @@ export default function LandingPageClient({ isAdmin }: LandingPageClientProps) {
             <p className="mt-8 text-lg font-medium text-pretty text-gray-400 sm:text-xl/8">
               Book appointments, manage care schedules, and keep your records organized in one secure platform built for patients and clinicians.
             </p>
-            <div className="mt-10 flex items-center justify-center gap-x-6">
+            <div className="mt-10 flex flex-col items-center gap-3 sm:flex-row sm:justify-center sm:gap-x-6">
               <Link
                 href="/auth/signup"
-                className="rounded-md bg-indigo-500 px-3.5 py-2.5 text-sm font-semibold text-white shadow-xs hover:bg-indigo-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500"
+                className="inline-flex w-full items-center justify-center rounded-md bg-indigo-500 px-3.5 py-2.5 text-sm font-semibold text-white shadow-xs hover:bg-indigo-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500 sm:w-auto"
               >
                 Get started
               </Link>
-              <Link href="/auth/login" className="text-sm/6 font-semibold text-white">
+              <Link href="/auth/login" className="inline-flex w-full items-center justify-center text-sm/6 font-semibold text-white sm:w-auto">
                 Learn more <span aria-hidden="true">→</span>
               </Link>
             </div>
@@ -378,7 +384,7 @@ export default function LandingPageClient({ isAdmin }: LandingPageClientProps) {
         </div>
       </div>
 
-      <section className="relative bg-gray-900 px-6 py-14 lg:px-8">
+      <section className="relative scroll-mt-28 bg-gray-900 px-6 py-14 lg:scroll-mt-32 lg:px-8">
         <div className="mx-auto max-w-4xl">
           <div className="rounded-3xl border border-indigo-300/25 bg-gradient-to-r from-indigo-500/15 via-cyan-400/10 to-indigo-500/15 px-6 py-10 text-center shadow-[0_0_0_1px_rgba(129,140,248,0.12)] sm:px-10">
             <p className="text-xs font-semibold uppercase tracking-[0.42em] text-indigo-200 sm:text-sm">
@@ -394,7 +400,7 @@ export default function LandingPageClient({ isAdmin }: LandingPageClientProps) {
         </div>
       </section>
 
-      <section id="appointment-flow" ref={appointmentFlowRef} className="relative isolate overflow-hidden bg-gray-900 py-24 sm:py-32">
+      <section id="appointment-flow" ref={appointmentFlowRef} className="relative isolate scroll-mt-28 overflow-hidden bg-gray-900 py-24 sm:scroll-mt-32 sm:py-32">
         <img
           alt="Patients and healthcare team coordinating care"
           src={appointmentSectionBackgroundImage}
@@ -449,7 +455,7 @@ export default function LandingPageClient({ isAdmin }: LandingPageClientProps) {
                 </Link>
               ))}
             </div>
-            <dl id="appointment-impact" className="mt-16 grid grid-cols-1 gap-8 sm:mt-20 sm:grid-cols-2 lg:grid-cols-4">
+            <dl id="appointment-impact" className="mt-16 scroll-mt-28 grid grid-cols-1 gap-8 sm:mt-20 sm:scroll-mt-32 sm:grid-cols-2 lg:grid-cols-4">
               {appointmentStats.map((stat) => (
                 <div key={stat.name} className="flex flex-col-reverse gap-1">
                   <dt className="text-base/7 text-gray-300">{stat.name}</dt>
@@ -461,7 +467,7 @@ export default function LandingPageClient({ isAdmin }: LandingPageClientProps) {
         </div>
       </section>
 
-      <section id="physicians" className="mt-14 bg-gray-900 py-24 sm:mt-20 sm:py-32">
+      <section id="physicians" className="mt-14 scroll-mt-28 bg-gray-900 py-24 sm:mt-20 sm:scroll-mt-32 sm:py-32">
         <div className="mx-auto grid max-w-7xl gap-14 px-6 lg:px-8 xl:grid-cols-3">
           <div className="max-w-xl">
             <h2 className="text-3xl font-semibold tracking-tight text-white sm:text-4xl">Meet our physicians</h2>
@@ -499,7 +505,7 @@ export default function LandingPageClient({ isAdmin }: LandingPageClientProps) {
         </div>
       </section>
 
-      <section id="technology" className="mt-14 bg-gray-900 py-24 sm:mt-20 sm:py-32">
+      <section id="technology" className="mt-14 scroll-mt-28 bg-gray-900 py-24 sm:mt-20 sm:scroll-mt-32 sm:py-32">
         <div className="mx-auto max-w-7xl px-6 lg:px-8">
           <h2 className="text-center text-lg/8 font-semibold text-white">Powered by reliable cloud infrastructure</h2>
           <div className="mx-auto mt-10 grid max-w-lg grid-cols-4 items-center gap-x-8 gap-y-10 sm:max-w-2xl sm:grid-cols-6 sm:gap-x-10 lg:mx-0 lg:max-w-none lg:grid-cols-5">
@@ -547,7 +553,7 @@ export default function LandingPageClient({ isAdmin }: LandingPageClientProps) {
       </section>
 
       <main className="flex-1">
-        <section className="isolate bg-gray-900 px-6 py-20 lg:px-8">
+        <section className="isolate scroll-mt-28 bg-gray-900 px-6 py-20 lg:scroll-mt-32 lg:px-8">
           <div className="mx-auto grid max-w-7xl gap-12 lg:grid-cols-2">
             <div className="max-w-xl">
               <h2 className="text-4xl font-semibold tracking-tight text-white sm:text-5xl">Frequently asked questions</h2>
@@ -585,7 +591,7 @@ export default function LandingPageClient({ isAdmin }: LandingPageClientProps) {
           </div>
         </section>
 
-        <section id="company" className="isolate mt-14 bg-gray-900 px-6 py-24 sm:mt-20 sm:py-32 lg:px-8">
+        <section id="company" className="isolate mt-14 scroll-mt-28 bg-gray-900 px-6 py-24 sm:mt-20 sm:scroll-mt-32 sm:py-32 lg:px-8">
           <div
             aria-hidden="true"
             className="absolute inset-x-0 -top-40 -z-10 transform-gpu overflow-hidden blur-3xl sm:-top-80"
