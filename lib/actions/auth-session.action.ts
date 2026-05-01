@@ -10,6 +10,7 @@ import {
   PATIENT_SESSION_COOKIE,
   createSignedAuthToken,
 } from "@/lib/auth-cookies"
+import { account } from "@/lib/appwrite.config"
 import { updateStoredAdminPasskey, verifyAdminPasskey } from "@/lib/admin-passkey-store"
 
 function getCookieOptions(maxAge = DEFAULT_COOKIE_MAX_AGE) {
@@ -126,4 +127,22 @@ export async function clearPatientSessions() {
   const cookieStore = await cookies()
   cookieStore.delete(PATIENT_SESSION_COOKIE)
   cookieStore.delete(PATIENT_PENDING_COOKIE)
+}
+
+export async function beginGoogleOAuthSession({
+  successUrl,
+  failureUrl,
+}: {
+  successUrl: string
+  failureUrl: string
+}) {
+  if (!successUrl || !failureUrl) {
+    throw new Error("Google OAuth requires success and failure redirect URLs.")
+  }
+
+  return account.createOAuth2Token({
+    provider: "google",
+    success: successUrl,
+    failure: failureUrl,
+  })
 }
