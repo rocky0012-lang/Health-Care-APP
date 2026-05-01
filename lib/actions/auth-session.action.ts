@@ -138,12 +138,29 @@ export async function beginGoogleOAuthSession({
   failureUrl: string
 }) {
   if (!successUrl || !failureUrl) {
-    throw new Error("Google OAuth requires success and failure redirect URLs.")
+    return {
+      ok: false as const,
+      error: "Google sign up is currently unavailable. Please try again.",
+    }
   }
 
-  return account.createOAuth2Token({
-    provider: OAuthProvider.Google,
-    success: successUrl,
-    failure: failureUrl,
-  })
+  try {
+    const url = await account.createOAuth2Token({
+      provider: OAuthProvider.Google,
+      success: successUrl,
+      failure: failureUrl,
+    })
+
+    return {
+      ok: true as const,
+      url,
+    }
+  } catch (error) {
+    console.error("beginGoogleOAuthSession failed:", error)
+
+    return {
+      ok: false as const,
+      error: "Google sign up is currently unavailable. Please try again.",
+    }
+  }
 }

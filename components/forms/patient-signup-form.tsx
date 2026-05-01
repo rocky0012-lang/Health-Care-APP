@@ -46,6 +46,27 @@ export const PatientSignupForm = ({
   const [isGoogleLoading, setIsGoogleLoading] = useState(false)
   const [errorMessage, setErrorMessage] = useState("")
 
+  const getSafeErrorMessage = (error: unknown, fallback: string) => {
+    if (error instanceof Error) {
+      const message = error.message?.trim()
+
+      if (!message) {
+        return fallback
+      }
+
+      if (
+        message.includes("Server Components render") ||
+        message.includes("A digest property is included")
+      ) {
+        return fallback
+      }
+
+      return message
+    }
+
+    return fallback
+  }
+
   const form = useForm<z.infer<typeof userFormSchema>>({
     resolver: zodResolver(userFormSchema),
     defaultValues: {
@@ -85,7 +106,7 @@ export const PatientSignupForm = ({
       }
     } catch (error: any) {
       console.error("Failed to sign up patient:", error)
-      setErrorMessage(error?.message || "Unable to create your account right now.")
+      setErrorMessage(getSafeErrorMessage(error, "Unable to create your account right now."))
     } finally {
       setIsLoading(false)
     }
@@ -107,10 +128,16 @@ export const PatientSignupForm = ({
         failureUrl: `${baseUrl}/auth/signup?oauth=google&status=failed`,
       })
 
-      window.location.href = oauthUrl
+      if (!oauthUrl.ok) {
+        setErrorMessage(oauthUrl.error || "Unable to start Google sign up right now.")
+        setIsGoogleLoading(false)
+        return
+      }
+
+      window.location.href = oauthUrl.url
     } catch (error: any) {
       console.error("Failed to start Google sign up:", error)
-      setErrorMessage(error?.message || "Unable to start Google sign up right now.")
+      setErrorMessage(getSafeErrorMessage(error, "Unable to start Google sign up right now."))
       setIsGoogleLoading(false)
     }
   }
