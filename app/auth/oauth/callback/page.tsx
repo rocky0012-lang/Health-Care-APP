@@ -24,12 +24,12 @@ export default async function OAuthCallbackPage({
     await account.createSession(userId, secret)
 
     const patient = await getPatientByUserId(userId)
+    await beginPendingPatientSession(userId)
+
     if (patient) {
-      await beginPendingPatientSession(userId)
       redirect("/patientsDashboard")
     }
 
-    await beginPendingPatientSession(userId)
     redirect(`/patients/${userId}/register`)
   } catch (error) {
     console.error("Google OAuth callback failed:", error)

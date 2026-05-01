@@ -12,6 +12,7 @@ import {
 } from "@/lib/auth-cookies"
 import { account } from "@/lib/appwrite.config"
 import { updateStoredAdminPasskey, verifyAdminPasskey } from "@/lib/admin-passkey-store"
+import { OAuthProvider } from "node-appwrite"
 
 function getCookieOptions(maxAge = DEFAULT_COOKIE_MAX_AGE) {
   return {
@@ -141,7 +142,7 @@ export async function beginGoogleOAuthSession({
   }
 
   return account.createOAuth2Token({
-    provider: "google" as any,
+    provider: OAuthProvider.Google,
     success: successUrl,
     failure: failureUrl,
   })
