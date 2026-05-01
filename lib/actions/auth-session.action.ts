@@ -141,7 +141,7 @@ export async function beginGoogleOAuthSession({
   }
 
   return account.createOAuth2Token({
-    provider: "google",
+    provider: "google" as any,
     success: successUrl,
     failure: failureUrl,
   })
