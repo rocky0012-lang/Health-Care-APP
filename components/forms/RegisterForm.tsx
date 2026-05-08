@@ -76,7 +76,7 @@ const formSchema = z.object({
   }),
 })
 
-const RegisterForm = ({ userId }: { userId: string }) => {
+const RegisterForm = ({ userId, initialEmail = "" }: { userId: string; initialEmail?: string }) => {
   const router = useRouter()
   const maxBirthDate = new Date(Date.now() - new Date().getTimezoneOffset() * 60000)
     .toISOString()
@@ -92,7 +92,7 @@ const RegisterForm = ({ userId }: { userId: string }) => {
     defaultValues: {
       firstName: "",
       lastName: "",
-      email: "",
+      email: initialEmail,
       phone: "",
       birthDate: "",
       gender: "Male",
@@ -177,7 +177,8 @@ const RegisterForm = ({ userId }: { userId: string }) => {
           </Field>
           <Field className="grid gap-2">
             <FieldLabel htmlFor="email">Email</FieldLabel>
-            <Input id="email" type="email" placeholder="m@example.com" {...form.register("email")} />
+            <Input id="email" type="email" placeholder="m@example.com" disabled {...form.register("email")} />
+            <FieldDescription className="text-xs text-muted-foreground">Your email from OAuth provider (cannot be changed)</FieldDescription>
             <FieldError>{form.formState.errors.email?.message}</FieldError>
           </Field>
           <Field className="grid gap-2">

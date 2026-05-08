@@ -2,7 +2,7 @@ import React from "react"
 import Image from "next/image"
 import Link from "next/link"
 import RegisterForm from "@/components/forms/RegisterForm"
-
+import { users } from "@/lib/appwrite.config"
 
 type RegisterPageProps = {
   params: Promise<{ userId: string }>
@@ -10,6 +10,14 @@ type RegisterPageProps = {
 
 const RegisterPage = async ({ params }: RegisterPageProps) => {
   const { userId } = await params
+  
+  let initialEmail = ""
+  try {
+    const user = await users.get(userId)
+    initialEmail = user.email || ""
+  } catch (error) {
+    console.error("Failed to fetch user email for registration:", error)
+  }
         
   return (
     <div className="flex min-h-screen overflow-x-hidden">
@@ -23,7 +31,7 @@ const RegisterPage = async ({ params }: RegisterPageProps) => {
           </p>
 
 
-           <RegisterForm userId={userId} />
+           <RegisterForm userId={userId} initialEmail={initialEmail} />
 
 
           <div className="text-14-regular mt-12 flex w-full flex-col gap-3 text-center sm:mt-20 sm:flex-row sm:justify-between sm:text-left">
