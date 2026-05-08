@@ -30,7 +30,8 @@ import {
   getPatientByUserId,
   getPatientSavedPaymentMethod,
 } from "@/lib/actions/patient.action"
-import { getCurrentPatientUserId } from "@/lib/patient-session"
+import { getCurrentPatientUserId, setCurrentPatientUserId } from "@/lib/patient-session"
+import { fetchCurrentPatientSession } from "@/lib/session-api"
 
 type PatientDashboardData = {
   patient: Awaited<ReturnType<typeof getPatientByUserId>>
@@ -152,28 +153,34 @@ export default function PatientDashboardPage() {
   const [errorMessage, setErrorMessage] = useState("")
 
   useEffect(() => {
-    const patientUserId = getCurrentPatientUserId()
-
-    if (!patientUserId) {
-      setErrorMessage("Patient session is missing. Please sign in again.")
-      setIsLoading(false)
-      return
-    }
-
     let isMounted = true
 
-    const loadDashboard = async () => {
+    const loadDashboardWithSession = async () => {
       try {
-        const [patient, appointments, billingPreferences, savedPaymentMethod] = await Promise.all([
-          getPatientByUserId(patientUserId),
-          listPatientAppointments(patientUserId, 50),
-          getPatientBillingPreferences(patientUserId),
-          getPatientSavedPaymentMethod(patientUserId),
-        ])
+        let resolvedUserId = getCurrentPatientUserId()
 
-        if (!isMounted) {
+        if (!resolvedUserId) {
+          const session = await fetchCurrentPatientSession()
+          if (session?.ok && session.userId) {
+            setCurrentPatientUserId(session.userId)
+            resolvedUserId = session.userId
+          }
+        }
+
+        if (!resolvedUserId) {
+          setErrorMessage("Patient session is missing. Please sign in again.")
+          setIsLoading(false)
           return
         }
+
+        const [patient, appointments, billingPreferences, savedPaymentMethod] = await Promise.all([
+          getPatientByUserId(resolvedUserId),
+          listPatientAppointments(resolvedUserId, 50),
+          getPatientBillingPreferences(resolvedUserId),
+          getPatientSavedPaymentMethod(resolvedUserId),
+        ])
+
+        if (!isMounted) return
 
         setDashboardData({
           patient,
@@ -193,7 +200,7 @@ export default function PatientDashboardPage() {
       }
     }
 
-    void loadDashboard()
+    void loadDashboardWithSession()
 
     return () => {
       isMounted = false
