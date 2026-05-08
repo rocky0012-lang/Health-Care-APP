@@ -110,7 +110,6 @@ const socialLinks = [
   { name: 'Facebook', href: 'https://facebook.com', icon: FaFacebookF },
   { name: 'Instagram', href: 'https://instagram.com', icon: FaInstagram },
   { name: 'LinkedIn', href: 'https://linkedin.com', icon: FaLinkedinIn },
-  { name: 'GitHub', href: 'https://github.com', icon: FaGithub },
 ]
 
 type LandingPageClientProps = {
@@ -141,6 +140,27 @@ export default function LandingPageClient({ isAdmin }: LandingPageClientProps) {
 
   const closeMobileMenu = () => {
     setMobileMenuOpen(false)
+  }
+
+  const getSafeErrorMessage = (error: unknown, fallback: string) => {
+    if (error instanceof Error) {
+      const message = error.message?.trim()
+
+      if (!message) {
+        return fallback
+      }
+
+      if (
+        message.includes('Server Components render') ||
+        message.includes('A digest property is included')
+      ) {
+        return fallback
+      }
+
+      return message
+    }
+
+    return fallback
   }
 
   useEffect(() => {
@@ -226,14 +246,14 @@ export default function LandingPageClient({ isAdmin }: LandingPageClientProps) {
         setFormState({
           isLoading: false,
           success: false,
-          error: result.error || 'An error occurred',
+          error: getSafeErrorMessage(result.error, 'We could not send your message right now. Please try again later.'),
         })
       }
     } catch (error) {
       setFormState({
         isLoading: false,
         success: false,
-        error: 'An unexpected error occurred. Please try again.',
+        error: getSafeErrorMessage(error, 'We could not send your message right now. Please try again later.'),
       })
     }
   }
@@ -781,7 +801,7 @@ export default function LandingPageClient({ isAdmin }: LandingPageClientProps) {
           </div>
 
           <div className="mt-8 border-t border-white/10 pt-6 text-sm text-gray-400">
-            <p>© 2026 NetCare Flow, Inc. All rights reserved.</p>
+            <p>© 2026 NetCare Flow, Inc. Engineered by ❤️ and care.</p>
           </div>
         </div>
       </footer>
