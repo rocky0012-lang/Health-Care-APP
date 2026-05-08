@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { account } from "@/lib/appwrite.config"
-import { beginPendingPatientSession } from "@/lib/actions/auth-session.action"
+import { beginPendingPatientSession, activatePatientSession } from "@/lib/actions/auth-session.action"
 import { getPatientByUserId } from "@/lib/actions/patient.action"
 
 export async function GET(request: NextRequest) {
@@ -18,12 +18,15 @@ export async function GET(request: NextRequest) {
     await account.createSession(userId, secret)
 
     const patient = await getPatientByUserId(userId)
-    await beginPendingPatientSession(userId)
 
     if (patient) {
+      // Existing patient: activate full session and redirect to dashboard
+      await activatePatientSession(userId)
       return NextResponse.redirect(new URL("/patientsDashboard", request.url))
     }
 
+    // New patient: set pending session and redirect to registration
+    await beginPendingPatientSession(userId)
     return NextResponse.redirect(
       new URL(`/patients/${userId}/register`, request.url)
     )
