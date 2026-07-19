@@ -22,16 +22,15 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import { Spinner } from "@/components/ui/spinner"
-import { listDoctorAppointments } from "@/lib/actions/appointment.action"
-import { getDoctorByUserId } from "@/lib/actions/doctor.action"
+import { getDoctorDashboardData } from "@/lib/actions/doctor-dashboard.action"
 import { getCurrentDoctorUserId } from "@/lib/doctor-session"
 
 type DoctorDashboardData = {
-  doctor: Awaited<ReturnType<typeof getDoctorByUserId>>
-  appointments: Awaited<ReturnType<typeof listDoctorAppointments>>
+  doctor: Awaited<ReturnType<typeof getDoctorDashboardData>>["doctor"]
+  appointments: Awaited<ReturnType<typeof getDoctorDashboardData>>["appointments"]
 }
 
-type DoctorAppointmentRecord = Awaited<ReturnType<typeof listDoctorAppointments>>[number]
+type DoctorAppointmentRecord = DoctorDashboardData["appointments"][number]
 
 const quickLinks = [
   {
@@ -223,16 +222,13 @@ export default function DoctorDashboardPage() {
 
     const loadDashboard = async () => {
       try {
-        const [doctor, appointments] = await Promise.all([
-          getDoctorByUserId(doctorUserId),
-          listDoctorAppointments(doctorUserId, 150),
-        ])
+        const dashboard = await getDoctorDashboardData(doctorUserId, 150)
 
         if (!isMounted) {
           return
         }
 
-        setDashboardData({ doctor, appointments })
+        setDashboardData(dashboard)
       } catch (error) {
         console.error("Failed to load doctor dashboard", error)
         if (isMounted) {
