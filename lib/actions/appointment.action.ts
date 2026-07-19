@@ -174,6 +174,29 @@ async function withAppointmentRelations<T extends Record<string, any>>(appointme
   }
 }
 
+async function listDoctorAppointmentsByDoctorIdInternal(doctorId: string, limit = 100) {
+  if (!doctorId) {
+    return []
+  }
+
+  const response = await withAppwriteRetry(
+    () => tablesDB.listRows({
+      databaseId: DATABASE_ID!,
+      tableId: APPOINTMENT_TABLE_ID!,
+      queries: [Query.equal("doctor", [doctorId]), Query.orderDesc("appointment_date"), Query.limit(limit)],
+    }),
+    "listDoctorAppointmentsByDoctorIdInternal tablesDB.listRows"
+  )
+
+  const appointmentsWithRelations = await Promise.all(
+    response.rows.map((appointment) => withAppointmentRelations(appointment))
+  )
+
+  return appointmentsWithRelations
+    .map((appointment) => serializeAppointment(appointment))
+    .filter((appointment): appointment is NonNullable<typeof appointment> => Boolean(appointment))
+}
+
 function serializeAppointment<T extends Record<string, any>>(appointment: T | null) {
   if (!appointment) {
     return null
@@ -383,22 +406,17 @@ export const listDoctorAppointments = async (doctorUserId: string, limit = 100) 
     return []
   }
 
-  const response = await withAppwriteRetry(
-    () => tablesDB.listRows({
-      databaseId: DATABASE_ID!,
-      tableId: APPOINTMENT_TABLE_ID!,
-      queries: [Query.equal("doctor", [doctor.$id]), Query.orderDesc("appointment_date"), Query.limit(limit)],
-    }),
-    "listDoctorAppointments tablesDB.listRows"
-  )
+  return listDoctorAppointmentsByDoctorIdInternal(doctor.$id, limit)
+}
 
-  const appointmentsWithRelations = await Promise.all(
-    response.rows.map((appointment) => withAppointmentRelations(appointment))
-  )
+export const listDoctorAppointmentsByDoctorId = async (doctorId: string, limit = 100) => {
+  assertAppointmentConfig()
 
-  return appointmentsWithRelations
-    .map((appointment) => serializeAppointment(appointment))
-    .filter((appointment): appointment is NonNullable<typeof appointment> => Boolean(appointment))
+  if (!doctorId) {
+    return []
+  }
+
+  return listDoctorAppointmentsByDoctorIdInternal(doctorId, limit)
 }
 
 export const updateAppointmentStatus = async ({

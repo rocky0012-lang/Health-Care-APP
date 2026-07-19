@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect } from "react"
+import { useEffect, useMemo } from "react"
 import { z } from "zod"
 import { Controller, useForm } from "react-hook-form"
 import { Button } from "@/components/ui/button"
@@ -27,6 +27,12 @@ import {
   setStoredPatientName,
 } from "@/lib/patient-session"
 import { useRouter } from "next/navigation"
+
+function getTodayLocalDateString() {
+  const now = new Date()
+  const timezoneOffsetMs = now.getTimezoneOffset() * 60000
+  return new Date(now.getTime() - timezoneOffsetMs).toISOString().split("T")[0]
+}
 
 const formSchema = z.object({
   firstName: z
@@ -78,9 +84,7 @@ const formSchema = z.object({
 
 const RegisterForm = ({ userId, initialEmail = "" }: { userId: string; initialEmail?: string }) => {
   const router = useRouter()
-  const maxBirthDate = new Date(Date.now() - new Date().getTimezoneOffset() * 60000)
-    .toISOString()
-    .split("T")[0]
+  const maxBirthDate = useMemo(() => getTodayLocalDateString(), [])
 
   useEffect(() => {
     setCurrentPatientUserId(userId)
