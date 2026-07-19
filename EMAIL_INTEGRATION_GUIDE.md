@@ -84,7 +84,7 @@ All emails include:
 
 Already configured in `.env.local`:
 ```
-RESEND_API_KEY=re_E4eqf3Gy_FsWuWzAAJPMB5ZU5MNT1TKfX
+RESEND_API_KEY=re_E4...
 NEXT_PUBLIC_APP_URL=https://netcareflow.com
 ```
 
