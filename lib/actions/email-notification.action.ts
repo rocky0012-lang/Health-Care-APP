@@ -148,7 +148,7 @@ export async function sendPatientAppointmentCancelledEmail({
   portalLink?: string
 }) {
   const safePatientName = (patientName || "Patient").trim() || "Patient"
-  const safePortalLink = portalLink?.trim() || "https://netcare.example.com/portal"
+  const safePortalLink = portalLink?.trim() || "https://netcareflow.com"
   const appointmentSource = appointmentDate.includes("T")
     ? appointmentDate
     : `${appointmentDate}T${timeSlot}:00`
@@ -164,18 +164,23 @@ export async function sendPatientAppointmentCancelledEmail({
         minute: "2-digit",
       })
 
-  const html = `
-    <div style="font-family: Arial, sans-serif; line-height: 1.5; color: #0f172a;">
+ const html = `
+    <div style="font-family: Arial, sans-serif; line-height: 1.5; color: #0f172a; max-width: 600px; margin: 0 auto;">
       ${getEmailLogoHtml()}
-      <h2 style="margin: 0 0 12px;">Update regarding your appointment on ${formattedDate}</h2>
-      <p style="margin: 0 0 8px;">Hi ${safePatientName},</p>
-      <p style="margin: 0 0 8px;">We are reaching out to let you know that we’ve had to cancel your upcoming appointment due to essential system optimizations aimed at improving our patient services.</p>
-      <p style="margin: 0 0 8px;"><strong>What happens next?</strong></p>
-      <p style="margin: 0 0 8px;">You can reschedule immediately via our portal here: <a href="${safePortalLink}">${safePortalLink}</a>, or wait for our coordinator to call you within 24 hours to find a new time that works for you.</p>
-      <p style="margin: 0;">We apologize for this inconvenience and appreciate your patience as we improve our platform.</p>
+      <h2 style="margin: 0 0 16px; color: #1e293b; font-size: 20px;">Appointment Cancellation Notice</h2>
+      <p style="margin: 0 0 12px;">Dear ${safePatientName},</p>
+      <p style="margin: 0 0 12px;">Please be advised that your upcoming appointment scheduled for <strong>${formattedDate}</strong> has been cancelled due to an unexpected scheduling conflict.</p>
+      
+      <p style="margin: 16px 0 8px; font-weight: bold; color: #1e293b;">How to reschedule:</p>
+      <p style="margin: 0 0 12px;">You can select a new appointment time immediately by logging into your secure patient portal: <a href="${safePortalLink}" style="color: #2563eb; text-decoration: underline;">${safePortalLink}</a>.</p>
+      <p style="margin: 0 0 16px;">If you require further assistance or would prefer to speak with our staff directly, please contact our support desk through your dashboard.</p>
+      
+      <p style="margin: 0 0 24px;">We sincerely apologize for any inconvenience this may cause to your schedule and appreciate your patience.</p>
       ${renderEmailFooter(false)}
     </div>
   `
+
+
 
   await sendEmailToUser({
     userId,
@@ -199,7 +204,7 @@ export async function sendPatientAppointmentCompletedEmail({
 }) {
   const safePatientName = (patientName || "Patient").trim() || "Patient"
   const safeDoctorName = (doctorName || "Your doctor").trim() || "Your doctor"
-  const safePortalLink = portalLink?.trim() || "https://netcareflow.com/portal"
+  const safePortalLink = portalLink?.trim() || "https://www.netcareflow.com/auth/login"
   const appointmentSource = appointmentDate.includes("T") ? appointmentDate : `${appointmentDate}`
   const appointmentDateObject = new Date(appointmentSource)
   const formattedDate = Number.isNaN(appointmentDateObject.getTime())
@@ -212,19 +217,22 @@ export async function sendPatientAppointmentCompletedEmail({
       })
 
   const html = `
-    <div style="font-family: Arial, sans-serif; line-height: 1.5; color: #0f172a;">
+    <div style="font-family: Arial, sans-serif; line-height: 1.5; color: #0f172a; max-width: 580px; margin: 0 auto; padding: 12px;">
       ${getEmailLogoHtml()}
-      <h2 style="margin: 0 0 12px;">Recap of your visit with Dr. ${safeDoctorName}</h2>
-      <p style="margin: 0 0 8px;">Hi ${safePatientName},</p>
-      <p style="margin: 0 0 8px;">Thank you for visiting us on ${formattedDate} — it was a pleasure seeing you.</p>
-      <p style="margin: 0 0 8px;">We’ve updated your records with your treatment plan. A summary of your visit and any next steps are available in your patient portal.</p>
-      <p style="margin: 0 0 8px;">If you have any questions or need support, feel free to reach out at any time.</p>
-      <p style="margin: 0 0 8px;">Take care,</p>
-      <p style="margin: 0;">NetCare Flow</p>
-      <p style="margin: 0 0 8px;"><a href="${safePortalLink}">${safePortalLink}</a></p>
+      <h2 style="margin: 0 0 16px; color: #0f172a; font-size: 20px;">Recap of your visit with ${safeDoctorName}</h2>
+      <p style="margin: 0 0 12px;">Hi ${safePatientName},</p>
+      <p style="margin: 0 0 12px;">Thank you for visiting us on ${formattedDate} — it was a pleasure seeing you.</p>
+      <p style="margin: 0 0 12px;">A summary of your visit and any next steps are available in your patient portal.</p>
+      <p style="margin: 0 0 20px;">If you have any questions or need support, feel free to reach out at any time.</p>
+      
+      <p style="margin: 0;">Take care,</p>
+      <p style="margin: 0 0 16px; font-weight: bold;">NetCare Flow</p>
+      
+      <p style="margin: 0 0 8px;"><a href="${safePortalLink}" style="color: #2563eb; text-decoration: underline;">Access Patient Portal</a></p>
       ${renderEmailFooter(false)}
     </div>
   `
+
 
   await sendEmailToUser({
     userId,
