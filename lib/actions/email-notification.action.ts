@@ -173,12 +173,13 @@ export async function sendPatientAppointmentCancelledEmail({
       
       <p style="margin: 16px 0 8px; font-weight: bold; color: #1e293b;">How to reschedule:</p>
       <p style="margin: 0 0 12px;">You can select a new appointment time immediately by logging into your secure patient portal: <a href="${safePortalLink}" style="color: #2563eb; text-decoration: underline;">${safePortalLink}</a>.</p>
-      <p style="margin: 0 0 16px;">Alternatively, our scheduling coordinator will contact you within 24 hours to assist you in finding a new time that works for your schedule.</p>
+      <p style="margin: 0 0 16px;">If you require further assistance or would prefer to speak with our staff directly, please contact our support desk through your dashboard.</p>
       
       <p style="margin: 0 0 24px;">We sincerely apologize for any inconvenience this may cause to your schedule and appreciate your patience.</p>
       ${renderEmailFooter(false)}
     </div>
   `
+
 
 
   await sendEmailToUser({
@@ -218,10 +219,10 @@ export async function sendPatientAppointmentCompletedEmail({
   const html = `
     <div style="font-family: Arial, sans-serif; line-height: 1.5; color: #0f172a; max-width: 580px; margin: 0 auto; padding: 12px;">
       ${getEmailLogoHtml()}
-      <h2 style="margin: 0 0 16px; color: #0f172a; font-size: 20px;">Recap of your visit with Dr. ${safeDoctorName}</h2>
+      <h2 style="margin: 0 0 16px; color: #0f172a; font-size: 20px;">Recap of your visit with ${safeDoctorName}</h2>
       <p style="margin: 0 0 12px;">Hi ${safePatientName},</p>
       <p style="margin: 0 0 12px;">Thank you for visiting us on ${formattedDate} — it was a pleasure seeing you.</p>
-      <p style="margin: 0 0 12px;">We’ve updated your records with your treatment plan. A summary of your visit and any next steps are available in your patient portal.</p>
+      <p style="margin: 0 0 12px;">A summary of your visit and any next steps are available in your patient portal.</p>
       <p style="margin: 0 0 20px;">If you have any questions or need support, feel free to reach out at any time.</p>
       
       <p style="margin: 0;">Take care,</p>
