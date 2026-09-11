@@ -8,7 +8,7 @@ import {
 	verifySignedAuthToken,
 } from "@/lib/auth-cookies"
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
 	const { pathname } = request.nextUrl
 	const patientSessionToken = request.cookies.get(PATIENT_SESSION_COOKIE)?.value
 	const pendingPatientToken = request.cookies.get(PATIENT_PENDING_COOKIE)?.value
